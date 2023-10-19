@@ -4,83 +4,103 @@
 \name{ale}
 \alias{ale}
 \alias{ale-package}
-\title{ale_core.R}
+\title{Create and return ALE data, statistics, and plots}
 \usage{
 ale(
-  test_data,
+  data,
   model,
   x_cols = NULL,
-  output = c("plot", "data"),
+  y_col = NULL,
+  ...,
+  output = c("plots", "data", "stats"),
   pred_fun = function(object, newdata) {
      stats::predict(object = object, newdata =
-    newdata, type = predict_type)
+    newdata, type = pred_type)
  },
-  predict_type = "response",
+  pred_type = "response",
   x_intervals = 100,
   boot_it = 0,
   seed = 0,
   boot_alpha = 0.05,
-  boot_centre = "median",
+  boot_centre = "mean",
   relative_y = "median",
   y_type = NULL,
-  plot_alpha = 0.05,
+  median_band = 0.05,
+  rug_sample_size = 500,
+  min_rug_per_interval = 1,
   ale_xs = NULL,
-  ale_ns = NULL
+  ale_ns = NULL,
+  silent = FALSE
 )
 }
 \arguments{
-\item{test_data}{dataframe. Dataset from which to create predictions for the ALE.
-Normally, this should be a test dataset, not the dataset on which the model
-was trained.}
+\item{data}{dataframe. Dataset from which to create predictions for the ALE.}
 
-\item{model}{model object. Model for which ALE should be calculated. Must
-contain a \code{terms} element, from which the name of the outcome target variable
-will be automatically calculated.}
+\item{model}{model object. Model for which ALE should be calculated.
+May be any kind of R object that can make predictions from data.}
 
-\item{x_cols}{character. Vector of column names from \code{test_dataset} for which
+\item{x_cols}{character. Vector of column names from \code{data} for which
 one-way ALE data is to be calculated (that is, simple ALE without interactions).
-Must be provided if \code{ixn} is FALSE (default).}
+If not provided, ALE will be created for all columns in \code{data} except \code{y_col}.}
 
-\item{output}{character in c('plot', 'data'). Vector of types of results to return. 'plot' will return
-an ALE plot; 'data' will return the source ALE data; both together will return both.}
+\item{y_col}{character length 1. Name of the outcome target label (y) variable.
+If not provided, \code{ale} will try to detect it automatically. For non-standard
+models, \code{y_col} should be provided. For survival models, set \code{y_col} to the
+name of the binary event column; in that case, \code{pred_type} should also be specified.}
 
-\item{pred_fun, predict_type}{function,character. \code{pred_fun} is a function that
-returns a vector of predicted values of type \code{predict_type} from \code{model} on \code{test_data}.
+\item{...}{not used. Inserted to require explicit naming of subsequent arguments.}
+
+\item{output}{character in c('plots', 'data', 'stats'). Vector of types of results to return.
+'plots' will return an ALE plot; 'data' will return the source ALE data;
+'stats' will return ALE statistics. Each option must be listed to return the
+specified component. By default, all are returned.}
+
+\item{pred_fun, pred_type}{function,character length 1. \code{pred_fun} is a function that
+returns a vector of predicted values of type \code{pred_type} from \code{model} on \code{data}.
 See details.}
 
-\item{x_intervals}{non-negative integer. Maximum number of intervals on the x-axis
+\item{x_intervals}{positive integer length 1. Maximum number of intervals on the x-axis
 for the ALE data for each column in \code{x_cols}. The number of intervals that the algorithm generates
 might eventually be fewer than what the user specifies if the data values for
 a given x value do not support that many intervals.}
 
-\item{boot_it}{non-negative integer. Number of bootstrap iterations for the
-ALE values. If boot_it == 0 (default), then ALE will be calculated on the entire dataset
+\item{boot_it}{non-negative integer length 1. Number of bootstrap iterations for the
+ALE values. If \code{boot_it = 0} (default), then ALE will be calculated on the entire dataset
 with no bootstrapping.}
 
-\item{seed}{integer. Random seed. Supply this between runs to assure that
+\item{seed}{integer length 1. Random seed. Supply this between runs to assure that
 identical random ALE data is generated each time}
 
-\item{boot_alpha}{numeric from 0 to 1. Alpha for percentile-based confidence
+\item{boot_alpha}{numeric length 1 from 0 to 1. Alpha for percentile-based confidence
 interval range for the bootstrap intervals; the bootstrap confidence intervals
 will be the lowest and highest \code{(1 - 0.05) / 2} percentiles. For example,
-if \code{boot_alpha} == 0.05 (default), the intervals will be from the 2.5 and 97.5
+if \code{boot_alpha = 0.05} (default), the intervals will be from the 2.5 and 97.5
 percentiles.}
 
-\item{boot_centre}{character in c('median', 'mean'). When bootstrapping, the
+\item{boot_centre}{character length 1 in c('mean', 'median'). When bootstrapping, the
 main estimate for \code{ale_y} is considered to be \code{boot_centre}. Regardless of the
-value specified here, both the median and mean will be available.}
+value specified here, both the mean and median will be available.}
 
-\item{relative_y}{character in c('median', 'mean', 'zero'). The ale_y values will
+\item{relative_y}{character length 1 in c('median', 'mean', 'zero'). The ale_y values will
 be adjusted relative to this value. 'median' is the default. 'zero' will maintain the
 default of \code{ALEPlot::ALEPlot}, which is not shifted.}
 
-\item{y_type}{character. Datatype of the y (outcome) variable according to the
-types returned by the \code{var_type} function (see that function for options). If not
-provided, this will be automatically determined.}
+\item{y_type}{character length 1. Datatype of the y (outcome) variable.
+Must be one of c('binary', 'numeric', 'multinomial', 'ordinal'). Normally
+determined automatically; only provide for complex non-standard models that
+require it.}
 
-\item{plot_alpha}{numeric from 0 to 1. Alpha for "confidence interval" range
+\item{median_band}{numeric length 1 from 0 to 1. Alpha for "confidence interval" range
 for printing bands around the median for single-variable plots.
-The band range will be the median value of y ± \code{plot_alpha}.}
+The band range will be the median value of y ± \code{median_band}.}
+
+\item{rug_sample_size, min_rug_per_interval}{single non-negative integer length 1.
+Rug plots are normally
+down-sampled otherwise they are too slow. \code{rug_sample_size} specifies the size
+of this sample. To prevent down-sampling, set to \code{Inf}. To suppress rug plots,
+set to 0. When down-sampling, the rug plots maintain representativeness of the
+data by guaranteeing that each of the \code{x_intervals} intervals will retain at least
+\code{min_rug_per_interval} elements; usually set to just 1 or 2.}
 
 \item{ale_xs, ale_ns}{list of ale_x and ale_n vectors. If provided, these vectors will be used to
 set the intervals of the ALE x axis for each variable. By default (NULL), the
@@ -88,47 +108,76 @@ function automatically calculates the ale_x intervals. \code{ale_xs} is normally
 in advanced analyses where the ale_x intervals from a previous analysis are
 reused for subsequent analyses (for example, for full model bootstrapping;
 see the \code{model_bootstrap} function).}
+
+\item{silent}{logical length 1, default FALSE. If TRUE, do not display any
+non-essential messages during execution (such as progress bars).
+Regardless, any warnings and errors will always display.}
 }
 \value{
-list of ALE data tibbles and plots. The list is named by the x variables.
-Within each list element, the data or plot is returned as requested in
-the \code{output} argument.
+list with elements \code{data}, \code{plots}, and \code{stats} as requested in
+the \code{output} argument. Each of these is a list named by the x variables with
+the respective values for each variable. In addition, the return object
+recapitulates several elements that were passed as arguments that apply to
+all the x variables for the ALE calculation.
 }
 \description{
-Core functions for the ale package
-
-Accumulated Local Effects (ALE) were initially developed as a model-agnostic
-approach for global explanations of the results of black-box machine learning
-algorithms. ALE has two primary advantages over other approaches like PDP
-and SHAP: its values are not affected by the presence of interactions among
-variables in a mode and its computation is relatively rapid. This package
-rewrites the original \code{ALEPlot} code for calculating ALE data and it
-completely reimplements the plotting of ALE values. In addition, future
-versions hope to extend the original ALE concept beyond global explanations
-with ALE-based measures that can be used for statistical inference
-as well as an ALE-based approach for local explanations.
-}
-\details{
-Create and return ALE data and plots
-
-This is the central function that manages the creation of ALE data and plots
+\code{ale} is the central function that manages the creation of ALE data and plots
 for one-way ALE. For two-way interactions, see \code{ale_ixn}. This function calls
-\code{ale_core} that manages the ALE data and plot creation in detail. For details, see
+\code{ale_core} (a non-exported function) that manages the ALE data and plot creation in detail. For details, see
 the introductory vignette for this package or the details and examples below.
 
+\strong{Custom predict function}
+
 The calculation of ALE requires modifying several values of the original
-\code{test_data}. Thus, \code{ale} needs direct access to a \code{predict} function that work on
+\code{data}. Thus, \code{ale} needs direct access to a \code{predict} function that work on
 \code{model}. By default, \code{ale} uses a generic default \code{predict} function of the form
 \code{predict(model_object, new_data)} with the default prediction type of 'response'.
 If, however, the desired prediction values are not generated with that format,
-the user must specify what they want. Most of the time, they only need to change
-the prediction type to some other value by setting the \code{predict_type} argument
+the user must specify what they want. Most of the time, the only modification needed is
+to change the prediction type to some other value by setting the \code{pred_type} argument
 (e.g., to 'prob' to generated classification probabilities). But if the desired
 predictions need a different function signature, then the user must create a
-custom prediction function and pass it to \code{pred_fun}. See an example below.
+custom prediction function and pass it to \code{pred_fun}. The requirements for this
+custom function are:
+\itemize{
+\item It must take two arguments and nothing else: \code{object} (a model) and \code{newdata}
+(a dataframe or compatible table type). These argument names are according to
+the R convention for the generic stats::predict function.
+\item It must return a vector of numeric values as the prediction.
+}
 
-For binary prediction models, be sure to set the predict_type to whatever
-type returns probabilities (from 0 to 1)
+You can see an example below of a custom prediction function.
+
+\strong{Note:} \code{survival} models probably do not need a custom prediction function
+but \code{y_col} must be set to the name of the binary event column and
+\code{pred_type} must be set to the desired prediction type.
+
+\strong{ALE statistics}
+
+For details about the ALE-based statistics (ALED, ALER, NALED, and NALER), see
+\code{vignette("ale-statistics")}.
+
+\strong{About the \code{ale} package}
+
+Accumulated Local Effects (ALE) were initially developed as a model-agnostic
+approach for global explanations of the results of black-box machine learning
+algorithms. ALE has a key advantage over other approaches like partial
+dependency plots (PDP) and SHapley Additive exPlanations (SHAP): its values
+represent a clean functional decomposition of the model. As such, ALE values
+are not affected by the presence or absence of interactions among variables
+in a mode. Moreover, its computation is relatively rapid. This package
+rewrites the original code from the 'ALEPlot' package for calculating ALE data
+and it completely reimplements the plotting of ALE values. It also extends
+the original ALE concept to add bootstrap-based confidence intervals and
+ALE-based statistics that can be used for statistical inference.
+For more details, see Okoli, Chitu. 2023. “Statistical Inference Using
+Machine Learning and Classical Techniques Based on Accumulated Local Effects (ALE).”
+arXiv. \url{https://arxiv.org/abs/2310.09877}.
+}
+\details{
+ale_core.R
+
+Core functions for the ale package: ale, ale_ixn, and ale_core
 }
 \examples{
 diamonds
@@ -162,10 +211,7 @@ ale_gam_diamonds <- ale(diamonds_test, gam_diamonds)
 
 \donttest{
 # Plot the ALE data
-# Skip .common_data when iterating through the data for plotting
-ale_gam_diamonds[setdiff(names(ale_gam_diamonds), '.common_data')] |>
-  purrr::map(\(.x) .x$plot) |>  # extract plots as a list
-  gridExtra::grid.arrange(grobs = _, ncol = 2)
+gridExtra::grid.arrange(grobs = ale_gam_diamonds$plots, ncol = 2)
 
 # Bootstrapped ALE
 # This can be slow, since bootstrapping runs the algorithm boot_it times
@@ -173,15 +219,31 @@ ale_gam_diamonds[setdiff(names(ale_gam_diamonds), '.common_data')] |>
 # Create ALE with 100 bootstrap samples
 ale_gam_diamonds_boot <- ale(diamonds_test, gam_diamonds, boot_it = 100)
 
-# Bootstrapping produces confidence intervals
-# Skip .common_data when iterating through the data for plotting
-ale_gam_diamonds_boot[setdiff(names(ale_gam_diamonds_boot), '.common_data')] |>
-  purrr::map(\(.x) .x$plot) |>  # extract plots as a list
-  gridExtra::grid.arrange(grobs = _, ncol = 2)
+# Bootstrapped ALEs print with confidence intervals
+gridExtra::grid.arrange(grobs = ale_gam_diamonds_boot$plots, ncol = 2)
+
+
+# If the predict function you want is non-standard, you may define a
+# custom predict function. It must return a single numeric vector.
+custom_predict <- function(object, newdata) {
+  predict(object, newdata, type = 'link', se.fit = TRUE)$fit
 }
 
+ale_gam_diamonds_custom <- ale(
+  diamonds_test, gam_diamonds,
+  pred_fun = custom_predict
+)
 
+# Plot the ALE data
+gridExtra::grid.arrange(grobs = ale_gam_diamonds_custom$plots, ncol = 2)
 
+}
+
+}
+\references{
+Okoli, Chitu. 2023.
+“Statistical Inference Using Machine Learning and Classical Techniques Based
+on Accumulated Local Effects (ALE).” arXiv. \url{https://arxiv.org/abs/2310.09877}.
 }
 \seealso{
 Useful links:

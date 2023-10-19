@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Chitu Okoli" />
+
+<meta name="date" content="2023-10-19" />
+
+<title>ALE-based statistics for statistical inference and effect sizes</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">ALE-based statistics for statistical
+inference and effect sizes</h1>
+<h4 class="author">Chitu Okoli</h4>
+<h4 class="date">2023-10-19</h4>
+
+
+
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(mgcv)  <span class="co"># for datasets and for gam function</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="co">#&gt; Loading required package: nlme</span></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="co">#&gt; Attaching package: &#39;nlme&#39;</span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co">#&gt; The following object is masked from &#39;package:dplyr&#39;:</span></span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="co">#&gt;     collapse</span></span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="co">#&gt; This is mgcv 1.9-0. For overview type &#39;help(&quot;mgcv-package&quot;)&#39;.</span></span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="co">#&gt; Attaching package: &#39;mgcv&#39;</span></span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="co">#&gt; The following object is masked from &#39;package:nnet&#39;:</span></span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a><span class="co">#&gt;     multinom</span></span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a><span class="fu">library</span>(dplyr)  <span class="co"># for data manipulation</span></span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a><span class="fu">library</span>(ale)</span></code></pre></div>
+<p>Accumulated local effects (ALE) was developed by <a href="https://www.doi.org/10.1111/rssb.12377">Daniel Apley and Jingyu
+Zhu</a> as a global explanation approach for interpretable machine
+learning (IML). However, the <a href="ale-intro.html"><code>ale</code>
+package</a> aims to extend it for statistical inference, among other
+extensions. This vignette presents the initial effort at extending ALE
+for statistical inference. In particular, we present some effect size
+measures specific to ALE. We introduce these statistics in detail in a
+working paper: Okoli, Chitu. 2023. “Statistical Inference Using Machine
+Learning and Classical Techniques Based on Accumulated Local Effects
+(ALE).” arXiv. <a href="https://doi.org/10.48550/arXiv.2310.09877" class="uri">https://doi.org/10.48550/arXiv.2310.09877</a>. Please note
+that they might be further refined after peer review.</p>
+<div id="example-dataset" class="section level2">
+<h2>Example dataset</h2>
+<p>We will demonstrate ALE statistics using a dataset composed and
+transformed from the <code>mgcv</code> package. This package is required
+to create the generalized additive model (GAM) that we will use for this
+demonstration. (Strictly speaking, the source datasets are in the
+<code>nlme</code> package, which is loaded automatically when we load
+the <code>mgcv</code> package.) Here is the code to generate the data
+that we will work with:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Create and prepare the data</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="co"># Specific seed chosen to illustrate the spuriousness of the random variable</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">6</span>)  </span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>math <span class="ot">&lt;-</span> </span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>  <span class="co"># Start with math achievement scores per student</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>  MathAchieve <span class="sc">|&gt;</span> </span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>  <span class="fu">as_tibble</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>    <span class="at">school =</span> School <span class="sc">|&gt;</span> <span class="fu">as.character</span>() <span class="sc">|&gt;</span>  <span class="fu">as.integer</span>(),</span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a>    <span class="at">minority =</span> Minority <span class="sc">==</span> <span class="st">&#39;Yes&#39;</span>,</span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a>    <span class="at">female =</span> Sex <span class="sc">==</span> <span class="st">&#39;Female&#39;</span></span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a>  <span class="co"># summarize the scores to give per-school values</span></span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a>  <span class="fu">summarize</span>(</span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a>    <span class="at">.by =</span> school,</span>
+<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a>    <span class="at">minority_ratio =</span> <span class="fu">mean</span>(minority),</span>
+<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a>    <span class="at">female_ratio =</span> <span class="fu">mean</span>(female),</span>
+<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a>    <span class="at">math_avg =</span> <span class="fu">mean</span>(MathAch),</span>
+<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
+<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a>  <span class="co"># merge the summarized student data with the school data</span></span>
+<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a>  <span class="fu">inner_join</span>(</span>
+<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a>    MathAchSchool <span class="sc">|&gt;</span> </span>
+<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a>      <span class="fu">mutate</span>(<span class="at">school =</span> School <span class="sc">|&gt;</span> <span class="fu">as.character</span>() <span class="sc">|&gt;</span>  <span class="fu">as.integer</span>()),</span>
+<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a>    <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&#39;school&#39;</span> <span class="ot">=</span> <span class="st">&#39;school&#39;</span>)</span>
+<span id="cb2-27"><a href="#cb2-27" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
+<span id="cb2-28"><a href="#cb2-28" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb2-29"><a href="#cb2-29" tabindex="-1"></a>    <span class="at">public =</span> Sector <span class="sc">==</span> <span class="st">&#39;Public&#39;</span>,</span>
+<span id="cb2-30"><a href="#cb2-30" tabindex="-1"></a>    <span class="at">high_minority =</span> HIMINTY <span class="sc">==</span> <span class="dv">1</span>,</span>
+<span id="cb2-31"><a href="#cb2-31" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
+<span id="cb2-32"><a href="#cb2-32" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>School, <span class="sc">-</span>Sector, <span class="sc">-</span>HIMINTY) <span class="sc">|&gt;</span> </span>
+<span id="cb2-33"><a href="#cb2-33" tabindex="-1"></a>  <span class="fu">rename</span>(</span>
+<span id="cb2-34"><a href="#cb2-34" tabindex="-1"></a>    <span class="at">size =</span> Size,</span>
+<span id="cb2-35"><a href="#cb2-35" tabindex="-1"></a>    <span class="at">academic_ratio =</span> PRACAD,</span>
+<span id="cb2-36"><a href="#cb2-36" tabindex="-1"></a>    <span class="at">discrim =</span> DISCLIM,</span>
+<span id="cb2-37"><a href="#cb2-37" tabindex="-1"></a>    <span class="at">mean_ses =</span> MEANSES,</span>
+<span id="cb2-38"><a href="#cb2-38" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
+<span id="cb2-39"><a href="#cb2-39" tabindex="-1"></a>  <span class="co"># Remove ID column for analysis</span></span>
+<span id="cb2-40"><a href="#cb2-40" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>school) <span class="sc">|&gt;</span> </span>
+<span id="cb2-41"><a href="#cb2-41" tabindex="-1"></a>  <span class="fu">select</span>(</span>
+<span id="cb2-42"><a href="#cb2-42" tabindex="-1"></a>    math_avg, size, public, academic_ratio,</span>
+<span id="cb2-43"><a href="#cb2-43" tabindex="-1"></a>    female_ratio, mean_ses, minority_ratio, high_minority, discrim,</span>
+<span id="cb2-44"><a href="#cb2-44" tabindex="-1"></a>    <span class="fu">everything</span>()</span>
+<span id="cb2-45"><a href="#cb2-45" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
+<span id="cb2-46"><a href="#cb2-46" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb2-47"><a href="#cb2-47" tabindex="-1"></a>    <span class="at">rand_norm =</span> <span class="fu">rnorm</span>(<span class="fu">nrow</span>(MathAchSchool)) </span>
+<span id="cb2-48"><a href="#cb2-48" tabindex="-1"></a>  )</span>
+<span id="cb2-49"><a href="#cb2-49" tabindex="-1"></a></span>
+<span id="cb2-50"><a href="#cb2-50" tabindex="-1"></a><span class="fu">glimpse</span>(math)</span>
+<span id="cb2-51"><a href="#cb2-51" tabindex="-1"></a><span class="co">#&gt; Rows: 160</span></span>
+<span id="cb2-52"><a href="#cb2-52" tabindex="-1"></a><span class="co">#&gt; Columns: 10</span></span>
+<span id="cb2-53"><a href="#cb2-53" tabindex="-1"></a><span class="co">#&gt; $ math_avg       &lt;dbl&gt; 9.715447, 13.510800, 7.635958, 16.255500, 13.177687, 11…</span></span>
+<span id="cb2-54"><a href="#cb2-54" tabindex="-1"></a><span class="co">#&gt; $ size           &lt;dbl&gt; 842, 1855, 1719, 716, 455, 1430, 2400, 899, 185, 1672, …</span></span>
+<span id="cb2-55"><a href="#cb2-55" tabindex="-1"></a><span class="co">#&gt; $ public         &lt;lgl&gt; TRUE, TRUE, TRUE, FALSE, FALSE, TRUE, TRUE, FALSE, FALS…</span></span>
+<span id="cb2-56"><a href="#cb2-56" tabindex="-1"></a><span class="co">#&gt; $ academic_ratio &lt;dbl&gt; 0.35, 0.27, 0.32, 0.96, 0.95, 0.25, 0.50, 0.96, 1.00, 0…</span></span>
+<span id="cb2-57"><a href="#cb2-57" tabindex="-1"></a><span class="co">#&gt; $ female_ratio   &lt;dbl&gt; 0.5957447, 0.4400000, 0.6458333, 0.0000000, 1.0000000, …</span></span>
+<span id="cb2-58"><a href="#cb2-58" tabindex="-1"></a><span class="co">#&gt; $ mean_ses       &lt;dbl&gt; -0.428, 0.128, -0.420, 0.534, 0.351, -0.014, -0.007, 0.…</span></span>
+<span id="cb2-59"><a href="#cb2-59" tabindex="-1"></a><span class="co">#&gt; $ minority_ratio &lt;dbl&gt; 0.08510638, 0.12000000, 0.97916667, 0.40000000, 0.72916…</span></span>
+<span id="cb2-60"><a href="#cb2-60" tabindex="-1"></a><span class="co">#&gt; $ high_minority  &lt;lgl&gt; FALSE, FALSE, TRUE, FALSE, TRUE, FALSE, FALSE, FALSE, F…</span></span>
+<span id="cb2-61"><a href="#cb2-61" tabindex="-1"></a><span class="co">#&gt; $ discrim        &lt;dbl&gt; 1.597, 0.174, -0.137, -0.622, -1.694, 1.535, 2.016, -0.…</span></span>
+<span id="cb2-62"><a href="#cb2-62" tabindex="-1"></a><span class="co">#&gt; $ rand_norm      &lt;dbl&gt; 0.26960598, -0.62998541, 0.86865983, 1.72719552, 0.0241…</span></span></code></pre></div>
+<p>The structure has 160 rows, each of which refers to a school whose
+students have taken a mathematics achievement test. We describe the data
+here based on documentation from the <code>nlme</code> package but many
+details are not quite clear:</p>
+<table>
+<colgroup>
+<col width="41%" />
+<col width="25%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>variable</th>
+<th>format</th>
+<th>description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>math_avg</td>
+<td>double</td>
+<td>average mathematics achievement scores of all students in the
+school</td>
+</tr>
+<tr class="even">
+<td>size</td>
+<td>double</td>
+<td>the number of students in the school</td>
+</tr>
+<tr class="odd">
+<td>public</td>
+<td>logical</td>
+<td>TRUE if the school is in the public sector; FALSE if in the Catholic
+sector</td>
+</tr>
+<tr class="even">
+<td>academic_ratio</td>
+<td>double</td>
+<td>the percentage of students on the academic track</td>
+</tr>
+<tr class="odd">
+<td>female_ratio</td>
+<td>double</td>
+<td>percentage of students in the school that are female</td>
+</tr>
+<tr class="even">
+<td>mean_ses</td>
+<td>double</td>
+<td>mean socioeconomic status for the students in the school
+(measurement is not quite clear)</td>
+</tr>
+<tr class="odd">
+<td>minority_ratio</td>
+<td>double</td>
+<td>percentage of students that are members of a minority racial
+group</td>
+</tr>
+<tr class="even">
+<td>high_minority</td>
+<td>logical</td>
+<td>TRUE if the school has a high ratio of students of minority racial
+groups (unclear, but perhaps relative to the location of the
+school)</td>
+</tr>
+<tr class="odd">
+<td>discrim</td>
+<td>double</td>
+<td>the “discrimination climate” (perhaps an indication of extent of
+racial discrimination in the school?)</td>
+</tr>
+<tr class="even">
+<td>rand_norm</td>
+<td>double</td>
+<td>a completely random variable</td>
+</tr>
+</tbody>
+</table>
+<p>Of particular note is the variable <code>rand_norm</code>. We have
+added this completely random variable (with a normal distribution) to
+demonstrate what randomness looks like in our analysis.</p>
+<p>The outcome variable that is the focus of our analysis is
+<code>math_avg</code>, the average mathematics achievement scores of all
+students in each school. Here are its descriptive statistics:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">summary</span>(math<span class="sc">$</span>math_avg)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="co">#&gt;    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. </span></span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#&gt;    4.24   10.47   12.90   12.62   14.65   19.72</span></span></code></pre></div>
+</div>
+<div id="full-model-bootstrap" class="section level2">
+<h2>Full model bootstrap</h2>
+<p>Now we create a model and compute statistics on it. Because this is a
+<a href="ale-small-datasets.html">relatively small dataset</a>, we will
+carry out full model bootstrapping using the
+<code>model_bootstrap</code> function. We create a generalized additive
+model (GAM) so that we can capture non-linear relationships in the
+data.</p>
+<p>By default, <code>model_bootstrap</code> runs 100 bootstrap
+iterations; this can be controlled with the <code>boot_it</code>
+argument. Bootstrapping is usually rather slow, even on small datasets,
+since the entire process is repeated that many times. The default of 100
+should be sufficiently stable for model building, when you would want to
+run the bootstrapped algorithm several times and you do not want it to
+be too slow each time. For definitive conclusions, you could run 1,000
+bootstraps or more to confirm the results of 100 bootstraps.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>mb_gam <span class="ot">&lt;-</span> <span class="fu">model_bootstrap</span>(</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  math, </span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="st">&#39;gam(</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="st">     math_avg ~ public + high_minority +</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="st">     s(size) + s(academic_ratio) + s(female_ratio) + s(mean_ses) + </span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="st">     s(minority_ratio) + s(discrim) + s(rand_norm)</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="st">   )&#39;</span>,</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>  <span class="co"># For the GAM model coefficients, show details of all variables, parametric or not</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>  <span class="at">tidy_options =</span> <span class="fu">list</span>(<span class="at">parametric =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>  <span class="co"># tidy_options = list(parametric = NULL),</span></span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>  <span class="at">boot_it =</span> <span class="dv">40</span>,  <span class="co"># 100 by default but reduced here for a faster demonstration</span></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>  <span class="at">silent =</span> <span class="cn">TRUE</span>  <span class="co"># progress bars disabled for the vignette</span></span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>)</span></code></pre></div>
+<p>We can see the bootstrapped values of various overall model
+statistics by printing the <code>model_stats</code> element of the model
+bootstrap object:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>mb_gam<span class="sc">$</span>model_stats</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="co">#&gt; # A tibble: 5 × 7</span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co">#&gt;   name          estimate conf.low    mean  median conf.high     sd</span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;            &lt;dbl&gt;    &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co">#&gt; 1 df              41.5     30.2    41.5    40.9      53.6   7.07  </span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co">#&gt; 2 df.residual    119.     106.    119.    119.      130.    7.07  </span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="co">#&gt; 3 nobs           160      160     160     160       160     0     </span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt; 4 adj.r.squared    0.892    0.844   0.892   0.894     0.930 0.0238</span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="co">#&gt; 5 npar            66       66      66      66        66     0</span></span></code></pre></div>
+<p>The names of the columns follow the <code>broom</code> package
+conventions:</p>
+<ul>
+<li><code>name</code> is the specific overall model statistic described
+in the row.</li>
+<li><code>estimate</code> is the bootstrapped estimate of the statistic.
+It is the same as the bootstrap <code>mean</code> by default, though it
+can be set to the <code>median</code> with the <code>boot_centre</code>
+argument of <code>model_bootstrap</code>. Regardless, both the
+<code>mean</code> and <code>median</code> estimates are always returned.
+The <code>estimate</code> column is provided for convenience since that
+is a standard name in the <code>broom</code> package.</li>
+<li><code>conf.low</code> and <code>conf.high</code> are the lower and
+upper confidence intervals respectively. <code>model_bootstrap</code>
+defaults to a 95% confidence interval; this can be changed by setting
+the <code>boot_alpha</code> argument (the default is 0.05 for a 95%
+confidence interval).</li>
+<li><code>sd</code> is the standard deviation of the bootstrapped
+estimate.</li>
+</ul>
+<p>Our focus, however, in this vignette is on the effects of individual
+variables. These are available in the <code>model_coefs</code> element
+of the model bootstrap object:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>mb_gam<span class="sc">$</span>model_coefs</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="co">#&gt; # A tibble: 3 × 7</span></span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="co">#&gt;   term              estimate conf.low   mean median conf.high std.error</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;                &lt;dbl&gt;    &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt;</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="co">#&gt; 1 (Intercept)         12.7     11.9   12.7   12.7      13.7       0.483</span></span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="co">#&gt; 2 publicTRUE          -0.683   -1.84  -0.683 -0.644     0.241     0.618</span></span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="co">#&gt; 3 high_minorityTRUE    1.02    -0.142  1.02   1.02      1.88      0.663</span></span></code></pre></div>
+<p>In this vignette, we cannot go into the details of how GAM models
+work (you can learn more with <a href="https://noamross.github.io/gams-in-r-course/chapter1/" title="Tutorial on GAM">Noam Ross’s excellent tutorial</a>). However,
+for our model illustration here, the estimates for the parametric
+variables (the non-numeric ones in our model) are interpreted as regular
+statistical regression coefficients whereas the estimates for the
+non-parametric smoothed variables (those whose variable names are
+encapsulated by the smooth <code>s()</code> function) are actually
+estimates for expected degrees of freedom (EDF in GAM). The smooth
+function <code>s()</code> lets GAM model these numeric variables as
+flexible curves that fit the data better than a straight line. The
+<code>estimate</code> values for the smooth variables above are not so
+straightforward to interpret, but suffice it to say that they are
+completely different from regular regression coefficients.</p>
+<p>The <code>ale</code> package uses bootstrap-based confidence
+intervals, not p-values, to determine statistical significance. Although
+they are not quite as simple to interpret as counting the number of
+stars next to a p-value, they are not that complicated, either. Based on
+the default 95% confidence intervals, a coefficient is statistically
+significant if <code>conf.low</code> and <code>conf.high</code> are both
+positive or both negative. We can filter the results on this
+criterion:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>mb_gam<span class="sc">$</span>model_coefs <span class="sc">|&gt;</span> </span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  <span class="co"># filter is TRUE if conf.low and conf.high are both positive or both negative because</span></span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="co"># multiplying two numbers of the same sign results in a positive number.</span></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="fu">filter</span>((conf.low <span class="sc">*</span> conf.high) <span class="sc">&gt;</span> <span class="dv">0</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co">#&gt; # A tibble: 1 × 7</span></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="co">#&gt;   term        estimate conf.low  mean median conf.high std.error</span></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;          &lt;dbl&gt;    &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt;</span></span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="co">#&gt; 1 (Intercept)     12.7     11.9  12.7   12.7      13.7     0.483</span></span></code></pre></div>
+<p>The statistical significance of the <code>estimate</code> (EDF) of
+the smooth terms is meaningless here because EDF cannot go below 1.0.
+Thus, even the random term <code>s(rand_norm)</code> appears to be
+“statistically significant”. Only the values for the non-smooth
+(parametric terms) <code>public</code> and <code>high_minority</code>
+should be considered here. So, we find that neither of the coefficient
+estimates of <code>public</code> nor of <code>high_minority</code> has
+an effect that is statistically significantly different from zero. (The
+intercept is not conceptually meaningful here; it is a statistical
+artifact.)</p>
+<p>This initial analysis highlights two limitations of classical
+hypothesis-testing analysis. First, it might work suitably well when we
+use models that have traditional linear regression coefficients. But
+once we use more advanced models like GAM that flexibly fit the data, we
+cannot interpret coefficients meaningfully and so it is not so clear how
+to reach inferential conclusions. Second, a basic challenge with models
+that are based on the general linear model (including GAM and almost all
+other statistical analyses) is that their coefficient significance
+compares the estimates with the null hypothesis that there is no effect.
+However, even if there is an effect, it might not be practically
+meaningful. As we will see, ALE-based statistics are explicitly tailored
+to emphasize practical implications beyond the notion of “statistical
+significance”.</p>
+</div>
+<div id="ale-effect-size-measures" class="section level2">
+<h2>ALE effect size measures</h2>
+<p>ALE was developed to graphically display the relationship between
+predictor variables in a model and the outcome regardless of the nature
+of the model. Thus, before we proceed to describe our extension of
+effect size measures based on ALE, let us first briefly examine the ALE
+plots for each variable.</p>
+<div id="ale-plots" class="section level3">
+<h3>ALE plots</h3>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>gridExtra<span class="sc">::</span><span class="fu">grid.arrange</span>(<span class="at">grobs =</span> mb_gam<span class="sc">$</span>ale<span class="sc">$</span>plots, <span class="at">ncol =</span> <span class="dv">2</span>)</span></code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<p>We can see that most variables seem to have some sort of mean effect
+across various values. However, for statistical inference, our focus
+must be on the bootstrap intervals. Crucial to our interpretation is the
+middle grey band that indicates the median ± 2.5%, that is, the middle
+5% of all average mathematics achievement scores (<code>math_avg</code>)
+values in the dataset. We call this the “median band”. The idea is that
+if any predictor can do no better than influencing <code>math_avg</code>
+to fall within this middle median band, then it only has a minimal
+effect. For an effect to be considered statistically significant, there
+should be no overlap between the confidence regions of a predictor
+variable and the median band. (We use 5% by default, but the value can
+be changed with the <code>median_band</code> argument.)</p>
+<p>For categorical variables (<code>public</code> and
+<code>high_minority</code> above), the confidence interval bars for all
+categories overlap the median band. The confidence interval bars
+indicate two useful pieces of information to us. When we compare them to
+the median band, their overlap or lack thereof tells us about the
+practical significance of the category. When we compare the confidence
+bars of one category with those of others, it allows us to assess if the
+category has a statistically significant effect that is different from
+that of the other categories; this is equivalent to the regular
+interpretation of coefficients for GAM and other GLM models. In both
+cases, the confidence interval bars of the TRUE and FALSE categories
+overlap each other, indicating that there is no statistically
+significant difference between categories. Whereas the coefficient table
+above based on classic statistics indicated this conclusion for
+<code>public</code>, it indicated that <code>high_minority</code> had a
+statistically significant effect; our ALE analysis indicates that
+<code>high_minority</code> does not. In addition, each confidence
+interval band overlaps the median band, indicating that none of the
+effects is practically significant, either.</p>
+<p>For numeric variables, the confidence regions overlap the median band
+for most of the domains of the predictor variables except for some
+regions that we will examine. The extreme points of each variable
+(except for <code>discrim</code> and <code>female_ratio</code>) are
+usually either slightly below or slightly above the median band,
+indicating that extreme values have the most extreme effects: math
+achievement increases with increasing school size, academic track ratio,
+and mean socioeconomic status, whereas it decreases with increasing
+minority ratio. The ratio of females and the discrimination climate both
+overlap the median band for the entirety of their domains, so any
+apparent trends are not supported by the data.</p>
+<p>Of particular interest is the random variable <code>rand_norm</code>,
+whose average ALE appears to show some sort of pattern. However, we can
+see that the confidence intervals overlap the median band for its entire
+domain. We will return to the implications of this observation.</p>
+</div>
+<div id="ale-effect-size-measures-on-the-scale-of-the-y-outcome-variable" class="section level3">
+<h3>ALE effect size measures on the scale of the y outcome variable</h3>
+<p>Although ALE plots allow rapid and intuitive conclusions for
+statistical inference, it is often helpful to have summary numbers that
+quantify the average strengths of the effects of a variable. Thus, we
+have developed a collection of effect size measures based on ALE
+tailored for intuitive interpretation. To understand the intuition
+underlying the various ALE effect size measures, it is useful to first
+examine the <strong>ALE effects plot</strong>, which graphically
+summarizes the effect sizes of all the variables in the ALE analysis.
+This is generated when <code>ale</code> is executed and both statistics
+and plots are requested (which is the case by default) and is accessible
+with the To focus on all the measures for a specific variable, we can
+access the <code>ale$stats$effects_plot</code> element:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>mb_gam<span class="sc">$</span>ale<span class="sc">$</span>stats<span class="sc">$</span>effects_plot</span></code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<p>This plot is unusual, so it requires some explanation:</p>
+<ul>
+<li>The y (vertical) axis displays the x variables, rather than the x
+axis. This is consistent with most effect size plots because they list
+the full names of variables. It is more readable to list them as labels
+on the y axis than the other way around.</li>
+<li>The x (horizontal) axis thus displays the y (outcome) variable. But
+there are two representations of this same axis, one at the bottom and
+one at the top.</li>
+<li>On the bottom is a more typical axis of the outcome variable, in our
+case, <code>math_avg</code>. It is scaled as expected. In our case, the
+axis breaks default to five units each from 5 to 20, evenly spaced.</li>
+<li>On the top, the outcome variable is expressed as percentiles ranging
+from 0 (the minimum outcome value in the dataset) to 100 (the maximum).
+It is divided into 10 deciles of 10% each. Because percentiles are
+usually not evenly distributed in a dataset, the decile breaks are not
+evenly spaced.</li>
+<li>Thus, this plot has two x axes, the lower one in units of the
+outcome variable and the upper one in percentiles of the outcome
+variable. To reduce the confusion, the major vertical gridlines that are
+slightly darker align with the units of the outcome (lower axis) and the
+minor vertical gridlines that are slightly lighter align with the
+percentiles (upper axis).</li>
+<li>The vertical grey band in the middle is the median band,
+representing the median ± 2.5% of values.</li>
+<li>The variables on the horizontal axis are sorted by decreasing NALED
+value (explained below). NALED is the most universal ALE measure of
+effect size.</li>
+</ul>
+<p>Although it is somewhat confusing to have two axes, the percentiles
+are a direct transformation of the raw outcome values. The first two
+base ALE effect size measures below are in units of the outcome variable
+while their normalized versions are in percentiles of the outcome. Thus,
+the same plot can display the two kinds of measures simultaneously.
+Referring to this plot can help understand each of the measures, which
+we proceed to explain in detail.</p>
+<p>Before we explain these measures in detail, we must reiterate the
+timeless reminder that correlation is not causation. So, none of the
+scores necessarily means that an x variable <em>causes</em> a certain
+effect on the y outcome; we can only say that the ALE effect size
+measures indicate associated or related variations between the two
+variables.</p>
+<div id="ale-range-aler" class="section level4">
+<h4>ALE range (ALER)</h4>
+<p>The easiest ALE statistic to understand is the ALE range (ALER), so
+we begin there. It is simply the range from the minimum to the maximum
+of any <code>ale_y</code> value for that variable. Mathematically, that
+is</p>
+<p><span class="math display">\[\mathrm{ALER}(\mathrm{ale\_y}) = \{
+\min(\mathrm{ale\_y}), \max(\mathrm{ale\_y}) \}\]</span><br />
+where <span class="math inline">\(\mathrm{ale\_y}\)</span> is the vector
+of ALE y values for a variable.</p>
+<p>All the ALE effect size measures are centred on zero so that they are
+consistent regardless of if the user chooses to centre their plots on
+zero, the median, or the mean. Specifically,</p>
+<ul>
+<li><code>aler_min</code>: minimum of any <code>ale_y</code> value for
+the variable.</li>
+<li><code>aler_max</code>: maximum of any <code>ale_y</code> value for
+the variable.</li>
+</ul>
+<p>ALER shows the extreme values of a variable’s effect on the outcome.
+In the effects plot above, it is indicated by the extreme ends of the
+horizontal bars for each variable. We can access ALE effect size
+measures through the <code>ale$stats</code> element of the bootstrap
+result object, with multiple views. To focus on all the measures for a
+specific variable, we can access the <code>ale$stats$by_term</code>
+element. Here are the effect size measures for the categorical
+<code>public</code>:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>mb_gam<span class="sc">$</span>ale<span class="sc">$</span>stats<span class="sc">$</span>by_term<span class="sc">$</span>public</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="co">#&gt; # A tibble: 6 × 6</span></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="co">#&gt;   statistic estimate conf.low median   mean conf.high</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;        &lt;dbl&gt;    &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;     &lt;dbl&gt;</span></span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="co">#&gt; 1 aled         0.356  0.00550  0.314  0.356   0.907  </span></span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a><span class="co">#&gt; 2 aler_min    -0.323 -0.808   -0.276 -0.323  -0.00477</span></span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a><span class="co">#&gt; 3 aler_max     0.398  0.00645  0.356  0.398   1.03   </span></span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="co">#&gt; 4 naled        5.10   1.20     3.75   5.10   11.8    </span></span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a><span class="co">#&gt; 5 naler_min   45.5   39.3     46.6   45.5    48.8    </span></span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a><span class="co">#&gt; 6 naler_max   55.9   50.6     55.3   55.9    64.6</span></span></code></pre></div>
+<p>We see there that <code>public</code> has an ALER of -0.32, 0.4. When
+we consider that the median math score in the dataset is 12.9, this ALER
+indicates that the minimum of any ALE y value for <code>public</code>
+(when <code>public == TRUE</code>) is -0.32 below the median. This is
+shown at the 12.6 mark in the plot above. The maximum
+(<code>public == FALSE</code>) is 0.4 above the median, shown at the
+13.3 point above.</p>
+<p>The unit for ALER is the same unit as the outcome variable; in our
+case, that is <code>math_avg</code> ranging from 2 to 20. No matter what
+the average ALE values might be, the ALER quickly shows the minimum and
+maximum effects of any value of the x variable on the y variable.</p>
+<p>Now, here are the ALE effect size measures for the numeric
+<code>academic_ratio</code>:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>mb_gam<span class="sc">$</span>ale<span class="sc">$</span>stats<span class="sc">$</span>by_term<span class="sc">$</span>academic_ratio</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="co">#&gt; # A tibble: 6 × 6</span></span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="co">#&gt;   statistic estimate conf.low median   mean conf.high</span></span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;        &lt;dbl&gt;    &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;     &lt;dbl&gt;</span></span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="co">#&gt; 1 aled         0.593    0.357  0.608  0.593     0.847</span></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a><span class="co">#&gt; 2 aler_min    -3.67    -6.83  -3.65  -3.67     -0.787</span></span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a><span class="co">#&gt; 3 aler_max     1.63     0.721  1.49   1.63      2.86 </span></span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a><span class="co">#&gt; 4 naled        7.95     3.68   7.94   7.95     12.6  </span></span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a><span class="co">#&gt; 5 naler_min   18.1      1.87  14.3   18.1      44.4  </span></span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a><span class="co">#&gt; 6 naler_max   72.8     62.1   69.2   72.8      88.1</span></span></code></pre></div>
+<p>The ALER for <code>academic_ratio</code> is considerably broader with
+-3.67 below and 1.63 above the median.</p>
+</div>
+<div id="ale-deviation-aled" class="section level4">
+<h4>ALE deviation (ALED)</h4>
+<p>While the ALE range shows the most extreme effects a variable might
+have on the outcome, the ALE deviation indicates its average effect over
+its full domain of values. With the zero-centred ALE values, it is
+conceptually similar to the weighted mean absolute error (MAE) of the
+ALE y values. Mathematically, it is</p>
+<p><span class="math display">\[
+\mathrm{ALED}(\mathrm{ale\_y}, \mathrm{ale\_n}) = \frac{\sum_{i=1}^{k}
+\left| \mathrm{ale\_y}_i \times \mathrm{ale\_n}_i
+\right|}{\sum_{i=1}^{k} \mathrm{ale\_n}_i}
+\]</span> where <span class="math inline">\(i\)</span> is the index of
+<span class="math inline">\(k\)</span> ALE x intervals for the variable
+(for a categorical variable, this is the number of distinct categories),
+<span class="math inline">\(\mathrm{ale\_y}_i\)</span> is the ALE y
+value for the <span class="math inline">\(i\)</span>th ALE x interval,
+and <span class="math inline">\(\mathrm{ale\_n}_i\)</span> is the number
+of rows of data in the <span class="math inline">\(i\)</span>th ALE x
+interval.</p>
+<p>Based on its ALED, we can say that the average effect on math scores
+of whether a school is in the public or Catholic sector is 0.36 (again,
+out of a range from 2 to 20). In the effects plot above, the ALED is
+indicated by a white box bounded by parentheses ( and ). As it is
+centred on the median, we can readily see that the average effect of
+school sector barely exceeds the limits of the median band, indicating
+that it barely exceeds our threshold of practical relevance. The average
+effect for ratio of academic track students is slightly higher at 0.59.
+We can see on the plot that it slightly exceeds the median band on both
+sides, indicating its slightly stronger effect. We will comment on the
+values of other variables when we discuss the normalized versions of
+these scores, to which we proceed next.</p>
+</div>
+</div>
+<div id="normalized-ale-effect-size-measures" class="section level3">
+<h3>Normalized ALE effect size measures</h3>
+<p>Since ALER and ALED scores are scaled on the range of y for a given
+dataset, these scores cannot be compared across datasets. Thus, we
+present normalized versions of each with intuitive, comparable values.
+For intuitive interpretation, we normalize the scores on the minimum,
+median, and maximum of any dataset. In principle, we divide the
+zero-centred y values in a dataset into two halves: the lower half from
+the 0th to the 50th percentile (the median) and the upper half from the
+50th to the 100th percentile. (Note that the median is included in both
+halves). With zero-centred ALE y values, all negative and zero values
+are converted to their percentile score relative to the lower half of
+the original y values while all positive ALE y values are converted to
+their percentile score relative to the upper half. (Technically, this
+percentile assignment is called the empirical cumulative distribution
+function (ECDF) of each half.) Each half is then divided by two to scale
+them from 0 to 50 so that together they can represent 100 percentiles.
+(Note: when a centred ALE y value of exactly 0 occurs, we choose to
+include the score of zero ALE y in the lower half because it is
+analogous to the 50th percentile of all values, which more intuitively
+belongs in the lower half of 100 percentiles.) The transformed maximum
+ALE y is then scaled as a percentile from 0 to 100%. Its formula is</p>
+<p><span class="math display">\[
+\mathrm{norm\_ale\_y} = 100 \times \begin{cases}
+\frac{ECDF_{y_{\geq 0}}(\mathrm{ale\_y})}{2} &amp; \text{if
+}\mathrm{ale\_y} &gt; 0 \\
+\frac{-ECDF_{y_{\leq 0}}(\mathrm{ale\_y})}{2} &amp; \text{otherwise}
+\end{cases}
+\]</span> where - <span class="math inline">\(ECDF_{y_{\geq 0}}\)</span>
+is the ECDF of the non-negative values in <code>y</code>. - <span class="math inline">\(-ECDF_{y_{\leq 0}}\)</span> is the ECDF of the
+negative values in <code>y</code> after they have been inverted
+(multiplied by -1).</p>
+<p>Of course, the formula could be simplified by multiplying by 50
+instead of by 100 and not dividing the ECDFs by two each. But we prefer
+the form we have given because it is explicit that each ECDF represents
+only half the percentile range and that the result is scored to 100
+percentiles.</p>
+<div id="normalized-aler-naler" class="section level4">
+<h4>Normalized ALER (NALER)</h4>
+<p>Based on this normalization, we first have the normalized ALER
+(NALER), which scales the minimum and maximum ALE y values from 0 to
+100%, centred on 50%:</p>
+<p><span class="math display">\[
+\mathrm{NALER}(\mathrm{y, ale\_y}) =
+\{\min(\mathrm{norm\_ale\_y}) + 100,
+\max(\mathrm{norm\_ale\_y}) + 100 \}
+\]</span></p>
+<p>where <span class="math inline">\(y\)</span> is the full vector of y
+values in the original dataset, required to calculate <span class="math inline">\(\mathrm{norm\_ale\_y}\)</span>.</p>
+<p>ALER shows the extreme values of a variable’s effect on the outcome.
+In the effects plot above, it is indicated by the extreme ends of the
+horizontal bars for each variable. We see there that <code>public</code>
+has an ALER of -0.32, 0.4. When we consider that the median math score
+in the dataset is 12.9, this ALER indicates that the minimum of any ALE
+y value for <code>public</code> (when <code>public == TRUE</code>) is
+-0.32 below the median. This is shown at the 12.6 mark in the plot
+above. The maximum (<code>public == FALSE</code>) is 0.4 above the
+median, shown at the 13.3 point above. The ALER for
+<code>academic_ratio</code> is considerably broader with -3.67 below and
+1.63 above the median.</p>
+<p>The result of this transformation is that NALER values can be
+interpreted as percentiles with respect to the range of y around the
+median (50%). <code>naler_min</code> is always less than 50% and
+<code>naler_max</code> is always greater than 50%. Their numbers
+represent the limits of the effect of the x variable with units in
+percentile scores of y. In the effects plot above, because the
+percentile scale on the top corresponds exactly to the raw scale below,
+the NALER limits are represented by exactly the same points as the ALER
+limits; only the scale changes. The scale for ALER and ALED is the lower
+scale of the raw outcomes; the scale for NALER and NALED is the upper
+scale of percentiles.</p>
+<p>So, with a NALER of 45.53, 55.91, the minimum of any ALE value for
+<code>public</code> (<code>public == TRUE</code>) shifts math scores to
+the 46th percentile of y values whereas the maximum
+(<code>public == FALSE</code>) shifts math scores to the 56th
+percentile. Academic track ratio has a NALER of 18.09, 72.8, ranging
+from the 18th to the 73th percentiles of math scores.</p>
+</div>
+<div id="normalized-aled-naled" class="section level4">
+<h4>Normalized ALED (NALED)</h4>
+<p>The normalization of ALED scores applies the same ALED formula as
+before but on the normalized ALE values instead of on the original ALE y
+values:</p>
+<p><span class="math display">\[
+\mathrm{NALED}(y, \mathrm{ale\_y}, \mathrm{ale\_n}) =
+\mathrm{ALED}(\mathrm{norm\_ale\_y}, \mathrm{ale\_n})
+\]</span></p>
+<p>NALED produces a score that ranges from 0 to 100%. It is essentially
+the ALED expressed in percentiles, that is, the average effect of a
+variable over its full domain of values. So, the NALED of public school
+status of 5.1 indicates that its average effect on math scores spans the
+middle 5.1 percent of scores. Academic ratio has an average effect
+expressed in NALED of 7.9% of scores.</p>
+<p>The NALED is particularly helpful in comparing the practical
+relevance of variables against our threshold by which we consider that a
+variable needs to shift the outcome on average by more than 5% of the
+median values. This threshold is the same scale as the NALED. So, we can
+tell that public school status with its NALED of 5.1 just barely crosses
+our threshold.</p>
+</div>
+</div>
+<div id="the-median-band-and-random-variables" class="section level3">
+<h3>The median band and random variables</h3>
+<p>It is particularly striking to note the ALE effect size measures for
+the random <code>rand_norm</code>:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>mb_gam<span class="sc">$</span>ale<span class="sc">$</span>stats<span class="sc">$</span>by_term<span class="sc">$</span>rand_norm</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="co">#&gt; # A tibble: 6 × 6</span></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="co">#&gt;   statistic estimate conf.low median   mean conf.high</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;        &lt;dbl&gt;    &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;     &lt;dbl&gt;</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a><span class="co">#&gt; 1 aled         0.328    0.112  0.336  0.328     0.553</span></span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a><span class="co">#&gt; 2 aler_min    -1.43    -3.66  -1.05  -1.43     -0.284</span></span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a><span class="co">#&gt; 3 aler_max     1.45     0.295  1.43   1.45      2.81 </span></span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a><span class="co">#&gt; 4 naled        4.64     1.49   4.68   4.64      7.28 </span></span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a><span class="co">#&gt; 5 naler_min   34.2     11.7   36.1   34.2      45.1  </span></span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a><span class="co">#&gt; 6 naler_max   70.6     55.6   70.9   70.6      87.0</span></span></code></pre></div>
+<p><code>rand_norm</code> has a NALED of 4.6. It might be surprising
+that a purely random value has any “effect size” to speak of, but
+statistically, it must have some numeric value or the other. However, by
+setting our default value for the median band at 5%, we effectively
+exclude <code>rand_norm</code> from serious consideration. Setting the
+median band too low at a value like 1% would not have excluded the
+random variable, but 5% seems like a nice balance. Thus, the effect of a
+variable like the discrimination climate score (discrim, 4) should
+probably not be considered practically meaningful.</p>
+<p>On one hand, 5% as a threshold for the median band might seem to be
+somewhat arbitrary, inspired by traditional <span class="math inline">\(\alpha\)</span> = 0.05 for statistical
+significance and confidence intervals. The “correct” baseline should be
+a qualitative question, depending on an analyst’s goals and the context
+of a specific study. On the other hand, our initial analyses here show
+that 5% seems to be an effective choice for excluding a purely random
+variable from consideration, whether for small or for large
+datasets.</p>
+</div>
+</div>
+<div id="statistical-inference-with-ale" class="section level2">
+<h2>Statistical inference with ALE</h2>
+<p>Although effect sizes are valuable in summarizing the global effects
+of each variable, they mask much nuance since each variable varies in
+its effect along its domain of values. Thus, ALE is particularly
+powerful in its ability to make fine-grained inferences of a variable’s
+effect depending on its specific value.</p>
+<div id="ale-data-structures-for-categorical-and-numeric-variables" class="section level3">
+<h3>ALE data structures for categorical and numeric variables</h3>
+<p>To understand how bootstrapped ALE can be used for statistical
+inference, we must understand the structure of ALE data. Let’s begin
+simple with a binary variable with just two categories,
+<code>public</code>:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>mb_gam<span class="sc">$</span>ale<span class="sc">$</span>data<span class="sc">$</span>public</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="co">#&gt; # A tibble: 2 × 7</span></span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="co">#&gt;   ale_x ale_n ale_y ale_y_lo ale_y_mean ale_y_median ale_y_hi</span></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="co">#&gt;   &lt;ord&gt; &lt;int&gt; &lt;dbl&gt;    &lt;dbl&gt;      &lt;dbl&gt;        &lt;dbl&gt;    &lt;dbl&gt;</span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a><span class="co">#&gt; 1 FALSE    70  13.3     12.4       13.3         13.4     14.3</span></span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a><span class="co">#&gt; 2 TRUE     90  12.6     12.0       12.6         12.7     13.1</span></span></code></pre></div>
+<p>Here is the meaning of each column of <code>ale$data</code> for a
+categorical variable:</p>
+<ul>
+<li><code>ale_x</code>: the different categories that exist in the
+categorical variable.</li>
+<li><code>ale_n</code>: the number of rows for that category in the
+dataset provided to the function.</li>
+<li><code>ale_y</code>: the ALE function value calculated for that
+category. For bootstrapped ALE, this is the same as
+<code>ale_y_mean</code> by default or <code>ale_y_median</code> if the
+the <code>relative_y = &#39;median&#39;</code> argument is specified.</li>
+<li><code>ale_y_lo</code> and <code>ale_y_hi</code>: the lower and upper
+confidence intervals for the bootstrapped <code>ale_y</code> value.</li>
+</ul>
+<p>By default, the <code>ale</code> package centres ALE values on the
+median of the outcome variable; in our dataset, the median of all the
+schools’ average mathematics achievement scores is 12.9. With ALE
+centred on the median, the weighted sum of ALE y values (weighted on
+<code>ale_n</code>) above the median is approximately equal to the
+weighted sum of those below the median. So, in the ALE plots above, when
+you consider the number of instances indicated by the rug plots and
+category percentages, the average weighted ALE y approximately equals
+the median.</p>
+<p>Here is the ALE data structure for a numeric variable,
+<code>academic_ratio</code>:</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>mb_gam<span class="sc">$</span>ale<span class="sc">$</span>data<span class="sc">$</span>academic_ratio</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a><span class="co">#&gt; # A tibble: 65 × 7</span></span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="co">#&gt;    ale_x ale_n ale_y ale_y_lo ale_y_mean ale_y_median ale_y_hi</span></span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a><span class="co">#&gt;    &lt;dbl&gt; &lt;int&gt; &lt;dbl&gt;    &lt;dbl&gt;      &lt;dbl&gt;        &lt;dbl&gt;    &lt;dbl&gt;</span></span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a><span class="co">#&gt;  1  0        1  9.25     6.34       9.25         9.41     12.1</span></span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a><span class="co">#&gt;  2  0.05     2 11.0      9.04      11.0         11.0      12.9</span></span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a><span class="co">#&gt;  3  0.09     1 11.8     10.6       11.8         11.9      12.9</span></span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a><span class="co">#&gt;  4  0.1      2 12.0     11.1       12.0         12.0      13.3</span></span>
+<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a><span class="co">#&gt;  5  0.13     1 12.5     11.3       12.5         12.3      14.0</span></span>
+<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a><span class="co">#&gt;  6  0.14     2 12.3     11.2       12.3         12.2      14.1</span></span>
+<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a><span class="co">#&gt;  7  0.17     1 12.3     11.4       12.3         12.4      13.7</span></span>
+<span id="cb14-12"><a href="#cb14-12" tabindex="-1"></a><span class="co">#&gt;  8  0.18     4 12.4     11.6       12.4         12.3      13.9</span></span>
+<span id="cb14-13"><a href="#cb14-13" tabindex="-1"></a><span class="co">#&gt;  9  0.19     3 12.5     11.6       12.5         12.4      13.7</span></span>
+<span id="cb14-14"><a href="#cb14-14" tabindex="-1"></a><span class="co">#&gt; 10  0.2      3 12.5     11.5       12.5         12.3      13.7</span></span>
+<span id="cb14-15"><a href="#cb14-15" tabindex="-1"></a><span class="co">#&gt; # ℹ 55 more rows</span></span></code></pre></div>
+<p>The columns are the same as with a categorical variable, but the
+meaning of <code>ale_x</code> is different since there are no
+categories. To calculate ALE for numeric variables, the range of x
+values is divided into fixed intervals (by default 100, customizable
+with the <code>x_intervals</code> argument). If the x values have fewer
+than 100 distinct values in the data, then each distinct value becomes
+an ale_x interval. (This is often the case with smaller datasets like
+ours; here <code>academic_ratio</code> has only 65 distinct values.) If
+there are more than 100 distinct values, then the range is divided into
+100 percentile groups. So, <code>ale_x</code> represents each of these
+x-variable intervals. The other columns mean the same thing as with
+categorical variables: <code>ale_n</code> is the number of rows of data
+in each <code>ale_x</code> interval and <code>ale_y</code> is the
+calculated ALE for that <code>ale_x</code> value.</p>
+</div>
+<div id="bootstrap-based-inference-with-ale" class="section level3">
+<h3>Bootstrap-based inference with ALE</h3>
+<p>In a bootstrapped ALE plot, values within the confidence intervals
+are statistically significant; values outside of the median band can be
+considered at least somewhat meaningful. Thus, <strong>the essence of
+ALE-based statistical inference is that only effects that are
+simultaneously within the confidence intervals AND outside of the median
+band should be considered conceptually meaningful.</strong></p>
+<p>We can see this, for example, with the plot of
+<code>academic_ratio</code>:</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>mb_gam<span class="sc">$</span>ale<span class="sc">$</span>plots<span class="sc">$</span>academic_ratio</span></code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<p>It might not always be easy to tell from a plot which regions are
+relevant, so the results of statistical significance are summarized with
+the <code>ale$conf_regions</code> element, which can be accessed for
+each variable:</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>mb_gam<span class="sc">$</span>ale<span class="sc">$</span>conf_regions<span class="sc">$</span>academic_ratio</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="co">#&gt; # A tibble: 3 × 9</span></span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a><span class="co">#&gt;   start_x end_x x_span     n   n_pct start_y end_y trend relative_to_mid</span></span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a><span class="co">#&gt;     &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt;   &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;ord&gt;          </span></span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a><span class="co">#&gt; 1    0      0     0        1 0.00625    9.25  9.25 0     below          </span></span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a><span class="co">#&gt; 2    0.05   0.9   0.85   142 0.888     11.0  13.7  0.217 overlap        </span></span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a><span class="co">#&gt; 3    0.91   1     0.09    17 0.106     13.8  14.5  0.551 above</span></span></code></pre></div>
+<p>For numeric variables, the confidence regions summary has one row for
+each consecutive sequence of x values that have the same status: all
+values in the region are below the middle irrelevance band, they overlap
+the band, or they are all above the band. Here are the summary
+components:</p>
+<ul>
+<li><code>start_x</code> is the first and <code>end_x</code> is the last
+x value in the sequence. <code>start_y</code> is the y value that
+corresponds to <code>start_x</code> while <code>end_y</code> corresponds
+to <code>end_x</code>.</li>
+<li><code>n</code> is the number of data elements in the sequence;
+<code>n_pct</code> is the percentage of total data elements out of the
+total number.</li>
+<li><code>x_span</code> is the length of x of the sequence that has the
+same confidence status. However, so that it may be comparable across
+variables with different units of x, <code>x_span</code> is expressed as
+a percentage of the full domain of x values.</li>
+<li><code>trend</code> is the average slope from the point
+<code>(start_x, start_y)</code> to <code>(end_x, end_y)</code>. Because
+only the start and end points are used to calculate <code>trend</code>,
+it does not reflect any ups and downs that might occur between those two
+points. Since the various x values in a dataset are on different scales,
+the scales of the x and y values in calculating the <code>trend</code>
+are normalized on a scale of 100 each so that the trends for all
+variables are directly comparable. A positive <code>trend</code> means
+that, on average, y increases with x; a negative <code>trend</code>
+means that, on average, y decreases with x; a zero <code>trend</code>
+means that y has the same value at its start and end points–this is
+always the case if there is only one point in the indicated
+sequence.</li>
+<li><strong><code>relative_to_mid</code></strong> is the key information
+here. It indicates if all the values in sequence from
+<code>start_x</code> to <code>end_x</code> are below, overlapping, or
+above the median band:
+<ul>
+<li>below: the higher limit of the confidence interval of ALE y
+(<code>ale_y_hi</code>) is below the lower limit of the median
+band.</li>
+<li>above: the lower limit of the confidence interval of ALE y
+(<code>ale_y_lo</code>) is above the higher limit of the median
+band.</li>
+<li>overlap: neither of the first two conditions holds; that is, the
+confidence region from <code>ale_y_lo</code> to <code>ale_y_hi</code> at
+least partially overlaps the median band.</li>
+</ul></li>
+</ul>
+<p>These results tell us simply that, for <code>academic_ratio</code>,
+from 0 to 0, ALE is below the median band from 9.25 to 9.25. From 0.05
+to 0.9, ALE overlaps the median band from 11 to 13.7. From 0.91 to 1,
+ALE is above the median band from 13.8 to 14.5.</p>
+<p>Interestingly, most of the text of the previous paragraph was
+generated automatically by an internal (unexported function)
+<code>ale:::summarize_conf_regions_in_words</code>. (Since the function
+is not exported, you must use <code>ale:::</code> with three colons, not
+just two, if you want to access it.)</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>ale<span class="sc">:::</span><span class="fu">summarize_conf_regions_in_words</span>(mb_gam<span class="sc">$</span>ale<span class="sc">$</span>conf_regions<span class="sc">$</span>academic_ratio)</span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;From 0 to 0, ALE is below the median band from 9.25 to 9.25. From 0.05 to 0.9, ALE overlaps the median band from 11 to 13.7. From 0.91 to 1, ALE is above the median band from 13.8 to 14.5.&quot;</span></span></code></pre></div>
+<p>While the wording is rather mechanical, it nonetheless illustrates
+the potential value of being able to summarize the inferentially
+relevant conclusions in tabular form.</p>
+<p>Confidence region summary tables are available not only for numeric
+but also for categorical variables, as we see with <code>public</code>.
+Here is its ALE plot:</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>mb_gam<span class="sc">$</span>ale<span class="sc">$</span>plots<span class="sc">$</span>public</span></code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<p>And here is its confidence regions summary table:</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>mb_gam<span class="sc">$</span>ale<span class="sc">$</span>conf_regions<span class="sc">$</span>public</span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a><span class="co">#&gt; # A tibble: 2 × 5</span></span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a><span class="co">#&gt;   x         n n_pct     y relative_to_mid</span></span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a><span class="co">#&gt;   &lt;ord&gt; &lt;int&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;ord&gt;          </span></span>
+<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a><span class="co">#&gt; 1 FALSE    70 0.438  13.3 overlap        </span></span>
+<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a><span class="co">#&gt; 2 TRUE     90 0.562  12.6 overlap</span></span></code></pre></div>
+<p>Since we have categories here, there is no start or end positions and
+there is no trend. We instead have each <code>x</code> category and its
+single ALE <code>y</code> value, with the <code>n</code> and
+<code>n_pct</code> of the respective category and
+<code>relative_to_mid</code> as before to indicate whether the indicated
+category is below, overlaps with, or is above the median band.</p>
+<p>Again with the help of
+<code>ale:::summarize_conf_regions_in_words</code>, these results tell
+us that, for <code>public</code>, for FALSE, the ALE of 13.3 overlaps
+the median band. For TRUE, the ALE of 12.6 overlaps the median band.</p>
+<p>Again, our random variable <code>rand_norm</code> is particularly
+interesting. Here is its ALE plot:</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>mb_gam<span class="sc">$</span>ale<span class="sc">$</span>plots<span class="sc">$</span>rand_norm</span></code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<p>And here is its confidence regions summary table:</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>mb_gam<span class="sc">$</span>ale<span class="sc">$</span>conf_regions<span class="sc">$</span>rand_norm</span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a><span class="co">#&gt; # A tibble: 1 × 9</span></span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a><span class="co">#&gt;   start_x end_x x_span     n n_pct start_y end_y  trend relative_to_mid</span></span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a><span class="co">#&gt;     &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt; &lt;int&gt; &lt;dbl&gt;   &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt; &lt;ord&gt;          </span></span>
+<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a><span class="co">#&gt; 1   -2.40  2.61      1   160     1    11.9  12.8 0.0557 overlap</span></span></code></pre></div>
+<p>Despite the apparent pattern, we see that from -2.4 to 2.61, ALE
+overlaps the median band from 11.9 to 12.8. So, despite the random highs
+and lows in the bootstrap confidence interval, there is no reason to
+suppose that the random variable has any effect anywhere in its
+domain.</p>
+</div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

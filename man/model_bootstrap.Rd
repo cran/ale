@@ -7,13 +7,16 @@
 model_bootstrap(
   data,
   model_call_string,
+  ...,
   boot_it = 100,
   seed = 0,
   boot_alpha = 0.05,
+  boot_centre = "mean",
   output = c("ale", "model_stats", "model_coefs"),
   ale_options = list(),
   tidy_options = list(),
-  glance_options = list()
+  glance_options = list(),
+  silent = FALSE
 )
 }
 \arguments{
@@ -21,6 +24,8 @@ model_bootstrap(
 
 \item{model_call_string}{character. Character string of the full call for the model,
 except that the data option must be left out. The data option will be replaced with the \code{data} argument.}
+
+\item{...}{not used. Inserted to require explicit naming of subsequent arguments.}
 
 \item{boot_it}{integer from 0 to Inf. Number of bootstrap iterations.
 If boot_it = 0, then the model is run as normal once on the full \code{data} with
@@ -32,6 +37,8 @@ bootstrap samples are generated each time on the same data.}
 \item{boot_alpha}{numeric. The confidence level for the bootstrap confidence intervals is
 1 - boot_alpha. For example, the default 0.05 will give a 95\% confidence
 interval, that is, from the 2.5\% to the 97.5\% percentile.}
+
+\item{boot_centre}{See documentation for \code{ale}}
 
 \item{output}{character vector. Which types of bootstraps to calculate and return:
 \itemize{
@@ -46,15 +53,36 @@ except if included in this \code{output} argument.
 \item{ale_options, tidy_options, glance_options}{list of named arguments.
 Arguments to pass to the \code{ale}, \code{broom::tidy}, or \code{broom::glance} functions, respectively,
 beyond (or overriding) the defaults.}
+
+\item{silent}{See documentation for \code{ale}}
 }
 \value{
-list with the following elements (depending on values requested in
+list with tibbles of the following elements (depending on values requested in
 the \code{output} argument:
 \itemize{
 \item model_stats: bootstrapped results from \code{broom::glance}
 \item model_coefs: bootstrapped results from \code{broom::tidy}
-\item ale_data: bootstrapped ALE data and plots
+\item ale: bootstrapped ALE results
+\itemize{
+\item data: ALE data (see \code{ale} for details about the format)
+\item stats: ALE statistics. The same data is duplicated with different views
+that might be variously useful. The column
+\itemize{
+\item by_term: statistic, estimate, conf.low, median, mean, conf.high.
+("term" means variable name.)
+The column names are compatible with the \code{broom} package. The confidence intervals
+are based on the \code{ale} function defaults; they can be changed with the
+\code{ale_options} argument. The estimate is the median or the mean, depending
+on the \code{boot_centre} argument.
+\item by_statistic: term, estimate, conf.low, median, mean, conf.high.
+\item estimate: term, then one column per statistic Provided with the default
+estimate. This view does not present confidence intervals.
+}
+\item plots: ALE plots (see \code{ale} for details about the format)
+}
 \item boot_data: full bootstrap data (not returned by default)
+\item other values: the \code{boot_it}, \code{seed}, \code{boot_alpha}, and \code{boot_centre} arguments that
+were originally passed are returned for reference.
 }
 }
 \description{
@@ -88,19 +116,20 @@ each of those values across all bootstrap samples.
 attitude
 
 ## ALE for general additive models (GAM)
-gam_attitude <- mgcv::gam(rating ~ s(complaints) + s(privileges) + s(learning) +
-                            s(raises) + s(critical) + s(advance),
+## GAM is tweaked to work on the small dataset.
+gam_attitude <- mgcv::gam(rating ~ complaints + privileges + s(learning) +
+                            raises + s(critical) + advance,
                           data = attitude)
 summary(gam_attitude)
 
 # Full model bootstrapping
-# Only 5 bootstrap iterations for a rapid example
+# Only 3 bootstrap iterations for a rapid example; default is 100
 # Increase value of boot_it for more realistic results
 mb_gam <- model_bootstrap(
   attitude,
-  'mgcv::gam(rating ~ s(complaints) + s(privileges) + s(learning) +
-               s(raises) + s(critical) + s(advance))',
-  boot_it = 5
+  'mgcv::gam(rating ~ complaints + privileges + s(learning) +
+               raises + s(critical) + advance)',
+  boot_it = 3
 )
 
 # Model statistics and coefficients
@@ -109,12 +138,15 @@ mb_gam$model_coefs
 
 \donttest{
 # Plot ALE
-mb_gam$ale_data[setdiff(names(mb_gam$ale_data), '.common_data')] |>
-  purrr::map(\(.x) .x$plot) |>  # extract plots as a list
-  gridExtra::grid.arrange(grobs = _, ncol = 2)
+gridExtra::grid.arrange(grobs = mb_gam$ale$plots, ncol = 2)
 }
 
 
 
 
+}
+\references{
+Okoli, Chitu. 2023.
+“Statistical Inference Using Machine Learning and Classical Techniques Based
+on Accumulated Local Effects (ALE).” arXiv. \url{https://arxiv.org/abs/2310.09877}.
 }

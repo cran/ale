@@ -4,6 +4,8 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 
+
+## ----load libraries-----------------------------------------------------------
 library(ale)
 
 ## ----attitude_str-------------------------------------------------------------
@@ -17,27 +19,42 @@ lm_attitude <- lm(rating ~ ., data = attitude)
 
 summary(lm_attitude)
 
+## ----enable progressr, eval = FALSE-------------------------------------------
+#  # Run this in an R console; it will not work directly within an R Markdown or Quarto block
+#  progressr::handlers(global = TRUE)
+#  progressr::handlers('cli')
+
 ## ----lm_simple, fig.width=7, fig.height=7-------------------------------------
-ale_lm_attitude_simple <- ale(attitude, lm_attitude)
+ale_lm_attitude_simple <- ale(
+  attitude, lm_attitude,
+  parallel = 2  # CRAN limit (delete this line on your own computer)
+)
 
 # Print all plots
-gridExtra::grid.arrange(grobs = ale_lm_attitude_simple$plots, ncol = 2)
+ale_lm_attitude_simple$plots |> 
+  patchwork::wrap_plots(ncol = 2)
 
 ## ----lm_ixn, fig.width=7, fig.height=7----------------------------------------
-ale_lm_attitude_ixn <- ale_ixn(attitude, lm_attitude)
+ale_lm_attitude_ixn <- ale_ixn(
+  attitude, lm_attitude,
+  parallel = 2  # CRAN limit (delete this line on your own computer)
+)
 
 # Print plots
 ale_lm_attitude_ixn$plots |>
-  purrr::walk(\(.x1) {  # extract list of x1 ALE outputs
-    gridExtra::grid.arrange(grobs = .x1, ncol = 2)  # plot all x1 plots
+  # extract list of x1 ALE outputs
+  purrr::walk(\(.x1) {  
+    # plot all x2 plots in each .x1 element
+    patchwork::wrap_plots(.x1, ncol = 2) |> 
+      print()
   })
 
 ## ----lm_full_call-------------------------------------------------------------
 mb_lm <- model_bootstrap(
   attitude, 
-  'lm(rating ~ .)',
+  lm_attitude,
   boot_it = 10,  # 100 by default but reduced here for a faster demonstration
-  silent = TRUE  # progress bars disabled for the vignette
+  parallel = 2  # CRAN limit (delete this line on your own computer)
 )
 
 ## ----lm_full_stats------------------------------------------------------------
@@ -47,7 +64,8 @@ mb_lm$model_stats
 mb_lm$model_coefs
 
 ## ----lm_full_ale, fig.width=7, fig.height=7-----------------------------------
-gridExtra::grid.arrange(grobs = mb_lm$ale$plots, ncol = 2)
+mb_lm$ale$plots |> 
+  patchwork::wrap_plots(ncol = 2)
 
 ## ----gam_summary--------------------------------------------------------------
 gam_attitude <- mgcv::gam(rating ~ complaints + privileges + s(learning) +
@@ -56,17 +74,20 @@ gam_attitude <- mgcv::gam(rating ~ complaints + privileges + s(learning) +
 summary(gam_attitude)
 
 ## ----gam_simple, fig.width=7, fig.height=7------------------------------------
-ale_gam_attitude_simple <- ale(attitude, gam_attitude)
+ale_gam_attitude_simple <- ale(
+  attitude, gam_attitude,
+  parallel = 2  # CRAN limit (delete this line on your own computer)
+)
 
-gridExtra::grid.arrange(grobs = ale_gam_attitude_simple$plots, ncol = 2)
+ale_gam_attitude_simple$plots |> 
+  patchwork::wrap_plots(ncol = 2)
 
 ## ----gam_full_stats-----------------------------------------------------------
 mb_gam <- model_bootstrap(
   attitude, 
-  'mgcv::gam(rating ~ complaints + privileges + s(learning) +
-               raises + s(critical) + advance)', 
+  gam_attitude, 
   boot_it = 10,  # 100 by default but reduced here for a faster demonstration
-  silent = TRUE  # progress bars disabled for the vignette
+  parallel = 2  # CRAN limit (delete this line on your own computer)
   )
 mb_gam$model_stats
 
@@ -74,5 +95,24 @@ mb_gam$model_stats
 mb_gam$model_coefs
 
 ## ----gam_full_ale, fig.width=7, fig.height=7----------------------------------
-gridExtra::grid.arrange(grobs = mb_gam$ale$plots, ncol = 2)
+mb_gam$ale$plots |> 
+  patchwork::wrap_plots(ncol = 2)
+
+## ----gam_summary_repeat-------------------------------------------------------
+gam_attitude_again <- mgcv::gam(rating ~ complaints + privileges + s(learning) +
+                                  raises + s(critical) + advance,
+                                data = attitude)
+summary(gam_attitude_again)
+
+## ----model_call_string--------------------------------------------------------
+mb_gam_non_standard <- model_bootstrap(
+  attitude,
+  gam_attitude_again,
+  model_call_string = 'mgcv::gam(rating ~ complaints + privileges + s(learning) +
+                                  raises + s(critical) + advance,
+                                data = boot_data)', 
+  boot_it = 10,  # 100 by default but reduced here for a faster demonstration
+  parallel = 2  # CRAN limit (delete this line on your own computer)
+  )
+mb_gam_non_standard$model_stats
 

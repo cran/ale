@@ -4,40 +4,36 @@
 # Calculate ALE interaction data
 #
 # This function is not exported. It is copy-pasted (with some variable name changes)
-# from `ALEPlot::ALEPlot`.
+# from [ALEPlot::ALEPlot()].
 # This function is not usually called directly by the user. For details about
-# arguments not documented here, see `ale`.
+# arguments not documented here, see [ale()].
 #
-#  @author Dan Apley (source of original calculation of ALE in `ALEPlot::ALEPlot`)
+#  @author Dan Apley (source of original calculation of ALE in [ALEPlot::ALEPlot()])
 #  @references Apley, Daniel W., and Jingyu Zhu.
 #  "Visualizing the effects of predictor variables in black box supervised learning models."
 #  Journal of the Royal Statistical Society Series B: Statistical Methodology
 #  82.4 (2020): 1059-1086.
-#  @author Chitu Okoli (rewrote the code based on `ALEPlot::ALEPlot` from while retaining ALE calculation)
+#  @author Chitu Okoli (rewrote the code based on [ALEPlot::ALEPlot()]` from while retaining ALE calculation)
 #
 # @param X dataframe. Data for which ALE is to be calculated. The y (outcome)
 # column is absent.
-# @param model See documentation for `ale`
+# @param model See documentation for [ale()]
 # @param x1_col,x2_col character length 1. Name of single columns in X for which
 # ALE interaction data is to be calculated. `x1_col` can be of any standard
 #  datatype (logical, factor, or numeric) but `x2_col` can only be numeric.
-# @param pred_fun See documentation for `ale`
-# @param x_intervals See documentation for `ale`
+# @param pred_fun See documentation for [ale()]
+# @param pred_type See documentation for [ale()]
+# @param x_intervals See documentation for [ale()]
 #
 # @import dplyr
 # @import purrr
 # @importFrom stats quantile
 #
-calc_ale_ixn <- function(X, model, x1_col, x2_col,
-                         # n_row, n_col,
-                         pred_fun, x_intervals) {
-
-  # Hack to prevent devtools::check from thinking that NSE variables are global:
-  # Make them null local variables within the function with the issues. So,
-  # when NSE applies, the NSE variables will be prioritized over these null
-  # local variables.
-  ale_x2 <- NULL
-
+calc_ale_ixn <- function(
+    X, model, x1_col, x2_col,
+    # n_row, n_col,
+    pred_fun, pred_type, x_intervals
+) {
 
   n_row <- nrow(X)
   n_col <- ncol(X)
@@ -82,10 +78,14 @@ calc_ale_ixn <- function(X, model, x1_col, x2_col,
     X12[c(x1_col, x2_col)] = cbind(z1[a1], z2[a2+1])
     X21[c(x1_col, x2_col)] = cbind(z1[a1+1], z2[a2])
     X22[c(x1_col, x2_col)] = cbind(z1[a1+1], z2[a2+1])
-    y.hat11 = pred_fun(object = model, newdata = X11)
-    y.hat12 = pred_fun(object = model, newdata = X12)
-    y.hat21 = pred_fun(object = model, newdata = X21)
-    y.hat22 = pred_fun(object = model, newdata = X22)
+    y.hat11 = pred_fun(model, X11, pred_type)
+    y.hat12 = pred_fun(model, X12, pred_type)
+    y.hat21 = pred_fun(model, X21, pred_type)
+    y.hat22 = pred_fun(model, X22, pred_type)
+    # y.hat11 = pred_fun(object = model, newdata = X11)
+    # y.hat12 = pred_fun(object = model, newdata = X12)
+    # y.hat21 = pred_fun(object = model, newdata = X21)
+    # y.hat22 = pred_fun(object = model, newdata = X22)
 
     Delta=(y.hat22-y.hat21)-(y.hat12-y.hat11)  #n_row-length vector of individual local effect values
 
@@ -196,10 +196,14 @@ calc_ale_ixn <- function(X, model, x1_col, x2_col,
     X22[row_idx_not_hi,x1_col] = levels_ale_order[x_ordered_idx[row_idx_not_hi]+1]
     X21[row_idx_not_hi,x2_col] = z2[a2][row_idx_not_hi]
     X22[row_idx_not_hi,x2_col] = z2[a2+1][row_idx_not_hi]
-    y.hat11 = pred_fun(object = model, newdata = X11[row_idx_not_hi,])
-    y.hat12 = pred_fun(object = model, newdata = X12[row_idx_not_hi,])
-    y.hat21 = pred_fun(object = model, newdata = X21[row_idx_not_hi,])
-    y.hat22 = pred_fun(object = model, newdata = X22[row_idx_not_hi,])
+    y.hat11 = pred_fun(model, X11[row_idx_not_hi,], pred_type)
+    y.hat12 = pred_fun(model, X12[row_idx_not_hi,], pred_type)
+    y.hat21 = pred_fun(model, X21[row_idx_not_hi,], pred_type)
+    y.hat22 = pred_fun(model, X22[row_idx_not_hi,], pred_type)
+    # y.hat11 = pred_fun(object = model, newdata = X11[row_idx_not_hi,])
+    # y.hat12 = pred_fun(object = model, newdata = X12[row_idx_not_hi,])
+    # y.hat21 = pred_fun(object = model, newdata = X21[row_idx_not_hi,])
+    # y.hat22 = pred_fun(object = model, newdata = X22[row_idx_not_hi,])
     delta_hi=(y.hat22-y.hat21)-(y.hat12-y.hat11)  #n.plus-length vector of individual local effect values
     row_idx_not_lo <- (1:n_row)[x_ordered_idx > 1]  #indices of rows for which X[[x1_col]] was not the lowest level
     X11 = X  #matrix with low X[[x1_col]] and low X[[x2_col]]
@@ -212,10 +216,14 @@ calc_ale_ixn <- function(X, model, x1_col, x2_col,
     X12[row_idx_not_lo,x2_col] = z2[a2+1][row_idx_not_lo]
     X21[row_idx_not_lo,x2_col] = z2[a2][row_idx_not_lo]
     X22[row_idx_not_lo,x2_col] = z2[a2+1][row_idx_not_lo]
-    y.hat11 = pred_fun(object = model, newdata = X11[row_idx_not_lo,])
-    y.hat12 = pred_fun(object = model, newdata = X12[row_idx_not_lo,])
-    y.hat21 = pred_fun(object = model, newdata = X21[row_idx_not_lo,])
-    y.hat22 = pred_fun(object = model, newdata = X22[row_idx_not_lo,])
+    y.hat11 = pred_fun(model, X11[row_idx_not_lo,], pred_type)
+    y.hat12 = pred_fun(model, X12[row_idx_not_lo,], pred_type)
+    y.hat21 = pred_fun(model, X21[row_idx_not_lo,], pred_type)
+    y.hat22 = pred_fun(model, X22[row_idx_not_lo,], pred_type)
+    # y.hat11 = pred_fun(object = model, newdata = X11[row_idx_not_lo,])
+    # y.hat12 = pred_fun(object = model, newdata = X12[row_idx_not_lo,])
+    # y.hat21 = pred_fun(object = model, newdata = X21[row_idx_not_lo,])
+    # y.hat22 = pred_fun(object = model, newdata = X22[row_idx_not_lo,])
     delta_lo=(y.hat22-y.hat21)-(y.hat12-y.hat11)  #n.neg-length vector of individual local effect values
 
 
@@ -282,7 +290,7 @@ calc_ale_ixn <- function(X, model, x1_col, x2_col,
       names_to = "ale_x2",
       values_to = "ale_y"
     ) |>
-    mutate(ale_x2 = as.numeric(ale_x2))
+    mutate(ale_x2 = as.numeric(.data$ale_x2))
 
   return(x1_x_x2_df)
 }

@@ -8,7 +8,7 @@
 #  This function is not exported. It creates a ggplot object that plots the input
 #  ALE data generated from `calc_ale`.
 #  This function is not usually called directly by the user. For details about
-#  arguments not documented here, see `ale`.
+#  arguments not documented here, see [ale()].
 #
 #
 #  @param ale_data tibble. Output data from `calc_ale`.
@@ -16,21 +16,25 @@
 #  be plotted.
 #  @param y_col character length 1. Name of y (output) column whose ALE data is to
 #  be plotted.
-#  @param y_type See documentation for `ale`
+#  @param y_type See documentation for [ale()]
 #  @param y_summary named double. Named vector of y summary statistics to be used
 #  for plotting.
 #  @param ... not used. Enforces explicit naming of subsequent arguments.
-#  @param relative_y See documentation for `ale`
-#  @param median_band See documentation for `ale`
-#  @param data dataframe. If provided, used to generate rug plots. Must at least
-#  contain columns x_col and y_col; any other columns are not used.
-#  @param rug_sample_size,min_rug_per_interval See documentation for `ale`
-#  @param seed See documentation for `ale`
+#  @param relative_y See documentation for [ale()]
+#  @param median_band_pct See documentation for [ale()]
+#  @param x_y dataframe with two columns: x_col and y_col.
+#  If provided, used to generate rug plots.
+#@param data dataframe. If provided, used to generate rug plots. Must at least
+#contain columns x_col and y_col; any other columns are not used.
+#  @param rug_sample_size,min_rug_per_interval See documentation for [ale()]
+#  @param compact_plots See documentation for [ale()]
+#  @param seed See documentation for [ale()]
 #
 #
 #  @import dplyr
-#  @import purrr
 #  @import ggplot2
+#  @importFrom glue glue
+#  @import purrr
 #
 plot_ale <- function(
     ale_data, x_col, y_col, y_type,
@@ -38,27 +42,18 @@ plot_ale <- function(
     ...,
     # ggplot_custom,
     relative_y = 'median',
-    median_band = 0.05,
-    data = NULL,
+    p_alpha = c(0.01, 0.05),
+    median_band_pct = c(0.05, 0.5),
+    x_y = NULL,
     rug_sample_size = 500,
     min_rug_per_interval = 1,
+    compact_plots = FALSE,
     seed = 0
     ) {
 
   # Validate arguments
   ellipsis::check_dots_empty()  # error if any unlisted argument is used (captured in ...)
 
-  # Hack to prevent devtools::check from thinking that NSE variables are global:
-  # Make them null local variables within the function with the issues. So,
-  # when NSE applies, the NSE variables will be prioritized over these null
-  # local variables.
-  ale_x <- NULL
-  ale_n <- NULL
-  ale_y <- NULL
-  ale_y_lo <- NULL
-  ale_y_hi <- NULL
-  rug_x <- NULL
-  rug_y <- NULL
 
   # Default relative_y is median. If it is mean or zero, then the y axis
   # must be shifted for appropriate plotting
@@ -81,7 +76,7 @@ plot_ale <- function(
 
   plot <-
     ale_data |>
-    ggplot(aes(x = ale_x, y = ale_y)) +
+    ggplot(aes(x = .data$ale_x, y = .data$ale_y)) +
     theme_bw() +
     # Zoom y-axis to the range of actual Y and ALE Y values.
     # In particular, ignore extreme ale_y_lo or ale_y_hi values, or else they
@@ -94,89 +89,101 @@ plot_ale <- function(
         max(y_summary[['max']], ale_data$ale_y)
       )
     ) +
-    # Add guides to show 25th and 75th percentiles of y
-    geom_hline(yintercept = y_summary[['25%']], linetype = "dashed") +
-    geom_hline(yintercept = y_summary[['75%']], linetype = "dashed") +
     # Add a band to show the average ± the confidence limits
     geom_rect(
       xmin = -Inf,
       xmax = Inf,
-      ymin = y_summary[['mid_lower']],
-      ymax = y_summary[['mid_upper']],
+      ymin = y_summary[['med_lo']],
+      ymax = y_summary[['med_hi']],
       fill = 'lightgray'
     ) +
-    # Add a secondary axis to label the percentiles
+    theme(axis.text.y.right = element_text(size = 8)) +
+    labs(
+      x = x_col,
+      y = y_col,
+      alt = glue('ALE plot of {y_col} against {x_col}')
+    )
+
+  # Add a secondary axis to label the percentiles
+  # Construct secondary (right) axis label from bottom to top.
+  sec_labels <- if (names(y_summary[1]) == 'p') {
+    # p-values were provided for y_summary; ALER is used
+    c(
+      # To prevent overlapping text, summarize all details only in the
+      # centre label; leave the others empty
+      '',  #empty
+      glue::glue(
+        'p(ALER)\n',
+        # Unicode ± must be replaced by \u00B1 for CRAN
+        '\u00B1{format(p_alpha[2], nsmall = 3)},\n',
+        '\u00B1{format(p_alpha[1], nsmall = 3)}'),
+      ''  #empty
+    )
+  }
+  else {
+    # without p-values, quantiles are used
+    c(
+      glue::glue('{50-(median_band_pct[2]*100/2)}%'),
+      relative_y,
+      glue::glue('{50+(median_band_pct[2]*100/2)}%')
+    )
+  }
+
+  sec_breaks <- c(
+    y_summary[['med_lo_2']],
+    if_else(relative_y == 'median', y_summary[['50%']],  y_summary[['mean']]),
+    y_summary[['med_hi_2']]
+  )
+
+  plot <- plot +
     scale_y_continuous(
       sec.axis = sec_axis(
-        trans = ~ .,  # do not change the scale
-        name = NULL,  # no axis title
-        labels = c('25%',
-                   relative_y,
-                   # Unicode ± must be replaced by \u00B1 for CRAN
-                   # paste0(relative_y, '\u00B1', format((median_band / 2) * 100), '%'),
-                   '75%'),
-        breaks = c(
-          y_summary[['25%']],
-          y_summary[['50%']],
-          y_summary[['75%']]
-        ),
-      )
-    ) +
-    theme(axis.text.y.right = element_text(size = 6)) +
-    labs(x = x_col, y = y_col)
+          trans = ~ .,  # ggplot2 will change argument to transform
+          name = NULL,
+          labels = sec_labels,
+          breaks = sec_breaks
+        )
+    )
+
+  # # Code to adjust after ggplot2 3.5.0
+  # plot <- plot +
+  #   scale_y_continuous(
+  #     sec.axis = if (utils::packageVersion('ggplot2') >= '3.5.0') {
+  #       sec_axis(
+  #         transform = ~ .,  # do not change the scale
+  #         name = NULL,  # no axis title
+  #         labels = sec_labels,
+  #         breaks = sec_breaks
+  #       )
+  #     } else {
+  #       # older versions of ggplot2::sec_axis() used trans argument instead of transform
+  #       sec_axis(
+  #         trans = ~ .,
+  #         name = NULL,
+  #         labels = sec_labels,
+  #         breaks = sec_breaks
+  #       )
+  #     }
+  #   )
+
 
   # Differentiate numeric x (line chart) from categorical x (bar charts)
   if (x_type == 'numeric') {
     plot <- plot +
-      geom_ribbon(aes(ymin = ale_y_lo, ymax = ale_y_hi),
+      geom_ribbon(aes(ymin = .data$ale_y_lo, ymax = .data$ale_y_hi),
                   fill = 'grey85', alpha = 0.5) +
       geom_line()
-
-    # Add rug plot if data is provided
-    if (!is.null(data) && rug_sample_size > 0) {
-      rug_data <- tibble(
-        rug_x = data[[x_col]],
-        rug_y = data[[y_col]] + y_shift,
-      )
-
-      # If the data is too big, down-sample or else rug plots are too slow
-      rug_data <- if (nrow(rug_data) > rug_sample_size) {
-        rug_sample(
-          rug_data,
-          ale_data$ale_x,
-          rug_sample_size = rug_sample_size,
-          min_rug_per_interval = min_rug_per_interval,
-          seed = seed
-        )
-      } else {
-        rug_data
-      }
-
-      plot <- plot +
-        geom_rug(
-          aes(x = rug_x, y = rug_y),
-          data = rug_data,
-          alpha = 0.5,
-          position = position_jitter(
-            # randomly jitter by 1% of the domain and range
-            width = 0.01 * diff(range(ale_data$ale_x)),
-            height = 0.01 * (y_summary[['max']] - y_summary[['min']]),
-            seed = seed
-          )
-        )
-    }
-
-  } else {  # x_type is not numeric
-
+  }
+  else {  # x_type is not numeric
     plot <- plot +
       geom_col(fill = 'gray') +
-      geom_errorbar(aes(ymin = ale_y_lo, ymax = ale_y_hi), width = 0.05) +
+      geom_errorbar(aes(ymin = .data$ale_y_lo, ymax = .data$ale_y_hi), width = 0.05) +
       # Add labels for percentage of dataset.
       # This serves the equivalent function of rugs for numeric data.
       # Varying column width is an idea, but it usually does not work well visually.
       geom_text(
         aes(
-          label = paste0(round((ale_n / total_n) * 100), '%'),
+          label = paste0(round((.data$ale_n / total_n) * 100), '%'),
           y = y_summary[['min']]
         ),
         size = 3,
@@ -189,11 +196,61 @@ plot_ale <- function(
       plot <- plot +
         theme(axis.text.x = element_text(angle = 90, hjust = 1))
     }
-
   }
 
+  # Add guides to show the outer median band.
+  # Add them late so that they superimpose most other elements.
+  plot <- plot +
+    geom_hline(yintercept = y_summary[['med_lo_2']], linetype = "dashed") +
+    geom_hline(yintercept = y_summary[['med_hi_2']], linetype = "dashed")
 
-  return(plot)
+
+  # Add rug plot if data is provided.
+  # Add them late so that they superimpose most other elements.
+  if (x_type == 'numeric' && !is.null(x_y) && rug_sample_size > 0) {
+    rug_data <- tibble(
+      rug_x = x_y[[x_col]],
+      rug_y = x_y[[y_col]] + y_shift,
+    )
+
+    # If the data is too big, down-sample or else rug plots are too slow
+    rug_data <- if (nrow(rug_data) > rug_sample_size) {
+      rug_sample(
+        rug_data,
+        ale_data$ale_x,
+        rug_sample_size = rug_sample_size,
+        min_rug_per_interval = min_rug_per_interval,
+        seed = seed
+      )
+    } else {
+      rug_data
+    }
+
+    plot <- plot +
+      geom_rug(
+        aes(x = .data$rug_x, y = .data$rug_y),
+        data = rug_data,
+        alpha = 0.5,
+        position = position_jitter(
+          # randomly jitter by 1% of the domain and range
+          width = 0.01 * diff(range(ale_data$ale_x)),
+          height = 0.01 * (y_summary[['max']] - y_summary[['min']]),
+          seed = seed
+        )
+      )
+    }
+
+  return(
+    if (compact_plots) {
+      # Strip plot of environment or other extraneous elements
+      # https://stackoverflow.com/a/77373906/2449926
+      plot |>
+      ggplotGrob() |>
+      ggpubr::as_ggplot()
+    } else {
+      plot
+    }
+  )
 }
 
 
@@ -203,28 +260,7 @@ plot_ale <- function(
 # This function is not exported. It creates a ggplot object that plots the input
 # ALE data generated from `calc_ale`.
 # This function is not usually called directly by the user. For details about
-# arguments not documented here, see `ale`.
-#
-# TODO: add rug plots on the x1 and x2 axes.
-# See general considerations at plot_ale.
-# However, the sampling must be stratified for plot_ale_ixn:
-# I must be sure to sample at least one or two cases from each n_x1_int and n_x2_int bin.
-# That way, no bin will be empty unless there is no data at all present in the
-# input test_data.
-#
-# if nrow(data) <= 500
-#   Use all data
-# else
-#   Sample 500 rows of data (x and y)
-#   For this sample, count how many rows fall into each x bin and each y bin
-#   For each x bin with fewer than min_rug_bin elements,
-#     Add in all the elements from such bins (so, final sample may exceed 500)
-#       Actually, first delete all members from such a bin then add them back in; this avoids duplicates
-#   Do the same for each y bin
-#     First deleting, then adding in all members is especially crucial to avoid duplicates at this step.
-#
-# With that, a manageable rug plot should be feasible.
-#
+# arguments not documented here, see [ale()].
 #
 #
 # @param ale_data tibble. Output data from `calc_ale`.
@@ -233,24 +269,28 @@ plot_ale <- function(
 # on the y axis.
 # @param y_col character length 1. Name of y (output) column whose ALE data is to
 # be plotted by colour.
-# @param y_type See documentation for `ale`
+# @param y_type See documentation for [ale()]
 # @param y_summary named double. Named vector of y summary statistics to be used
 # for plotting.
 # @param y_vals numeric. Vector of all values of y in the dataset used to create
 # `ale_data`.
 # @param ... not used. Enforces explicit naming of subsequent arguments.
-# @param relative_y See documentation for `ale`
-# @param median_band See documentation for `ale`
-# @param n_x1_int,n_x2_int See documentation for `ale_ixn`
-# @param n_y_quant See documentation for `ale_ixn`
-# @param data See documentation for `plot_ale`
-# @param rug_sample_size,min_rug_per_interval See documentation for `ale`
-# @param seed See documentation for `ale`
+# @param relative_y See documentation for [ale()]
+# @param median_band_pct See documentation for [ale()]
+# @param n_x1_int,n_x2_int See documentation for [ale_ixn()]
+# @param n_y_quant See documentation for [ale_ixn()]
+# @param x1_x2_y dataframe with three columns: x1_col, x2_col, and y_col.
+# If provided, used to generate rug plots.
+#@param data See documentation for `plot_ale`
+# @param rug_sample_size,min_rug_per_interval See documentation for [ale()]
+# @param compact_plots See documentation for [ale()]
+# @param seed See documentation for [ale()]
 #
 #
-# @import dplyr
-# @import purrr
-# @import ggplot2
+#  @import dplyr
+#  @import ggplot2
+#  @importFrom glue glue
+#  @import purrr
 #
 plot_ale_ixn <- function(
     ale_data, x1_col, x2_col, y_col, y_type,
@@ -259,29 +299,19 @@ plot_ale_ixn <- function(
     ...,
     # ggplot_custom, marginal, gg_marginal_custom,
     relative_y = 'median',
-    median_band = 0.05,
+    p_alpha = c(0.01, 0.05),
+    median_band_pct = c(0.05, 0.5),
     n_x1_int = 20, n_x2_int = 20, n_y_quant = 10,
-    data = NULL,
+    x1_x2_y = NULL,
+    # data = NULL,
     rug_sample_size = 500,
     min_rug_per_interval = 1,
+    compact_plots = FALSE,
     seed = 0
 ) {
 
   # Validate arguments
   ellipsis::check_dots_empty()  # error if any unlisted argument is used (captured in ...)
-
-  # Hack to prevent devtools::check from thinking that NSE variables are global:
-  # Make them null local variables within the function with the issues. So,
-  # when NSE applies, the NSE variables will be prioritized over these null
-  # local variables.
-  ale_x1 <- NULL
-  ale_x2 <- NULL
-  ale_y <- NULL
-  x1_quantile <- NULL
-  x2_quantile <- NULL
-  y_quantile <- NULL
-  rug_x <- NULL
-  rug_y <- NULL
 
 
   # Default relative_y is median. If it is mean or zero, then the y axis
@@ -307,8 +337,8 @@ plot_ale_ixn <- function(
     stats::quantile(
       probs = c(
         seq(0, 1, 1 / n_y_quant),
-        0.5 - (median_band / 2),
-        0.5 + (median_band / 2)
+        0.5 - (median_band_pct[1] / 2),
+        0.5 + (median_band_pct[1] / 2)
       ) |>
         sort()
     )
@@ -335,7 +365,6 @@ plot_ale_ixn <- function(
   y_legend <-
     map_chr(1:n_y_quant, function(i) {
     lgd <- paste0(
-      # quantile_chars[i],
       quantile_mids[i],
       ' [', y_quantile_names[i], '-', y_quantile_names[i + 1], '%)'
     )
@@ -367,7 +396,7 @@ plot_ale_ixn <- function(
       # For numeric x1, this is only temporarily--it will be properly
       # configured in the next code block.
       # This lets the code be cleaner than inserting an if_else here.
-      x1_quantile = ale_x1,
+      x1_quantile = .data$ale_x1,
 
       # x2_quantile: divide ale_x2 into n_x2_int bins.
       # ntile (the bin number) is divided by the number of bins (n_x2_int)
@@ -378,7 +407,7 @@ plot_ale_ixn <- function(
                      + min(ale_data$ale_x2)),
 
       # y_quantile: which of the n_y_quant in which ale_y falls
-      y_quantile = ale_y |>
+      y_quantile = .data$ale_y |>
         findInterval(y_quantiles) |>
         # levels must be set so that all quantiles appear in legend
         ordered(levels = 1:(n_y_quant - 1))
@@ -397,7 +426,7 @@ plot_ale_ixn <- function(
 
   plot <-
     ale_data |>
-    ggplot(aes(x = x1_quantile, y = x2_quantile, fill = y_quantile)) +
+    ggplot(aes(x = .data$x1_quantile, y = .data$x2_quantile, fill = .data$y_quantile)) +
     theme_bw() +
     geom_tile() +
     scale_fill_manual(
@@ -407,25 +436,31 @@ plot_ale_ixn <- function(
       labels = y_legend,
     ) +
     labs(
-      x = x1_col, y = x2_col,
-      fill = paste0(y_col, ' interaction')
+      x = x1_col,
+      y = x2_col,
+      fill = paste0(y_col, ' interaction'),
+      alt = glue(
+        'ALE interaction plot of {y_col} encoded as contours of its interaction ',
+        'effect of {x1_col} on the horizontal axis and {x2_col} on the vertical axis'
+      )
     ) +
-    theme(legend.title = element_text(size = 10)) +
+  theme(legend.title = element_text(size = 10)) +
     theme(legend.text = element_text(size = 8)) +
     theme(legend.key.size = unit(4, "mm"))
 
-  # Add rug plot if data is provided
-  if (!is.null(data) && rug_sample_size > 0) {
+  # Add rug plot if x1_x2_y is provided
+  if (!is.null(x1_x2_y) && rug_sample_size > 0) {
     rug_data <- tibble(
-      rug_x = data[[x1_col]],
-      rug_y = data[[x2_col]],
+      rug_x = x1_x2_y[[x1_col]],
+      rug_y = x1_x2_y[[x2_col]],
     )
 
     # If the data is too big, down-sample for rug plots
     rug_data <- if (nrow(rug_data) > rug_sample_size) {
       rug_sample(
         rug_data,
-        ale_data$ale_x1,
+        ale_data$x1_quantile |> unique(),
+        ale_data$x2_quantile |> unique(),
         rug_sample_size = rug_sample_size,
         min_rug_per_interval = min_rug_per_interval,
         seed = seed
@@ -436,7 +471,10 @@ plot_ale_ixn <- function(
 
     plot <- plot +
       geom_rug(
-        aes(x = rug_x, y = rug_y),
+        aes(
+          x = .data$rug_x, y = .data$rug_y,
+          fill = NULL  # remove the fill from the previous layer
+        ),
         data = rug_data
       )
   }
@@ -447,42 +485,44 @@ plot_ale_ixn <- function(
       theme(axis.text.x = element_text(angle = 90, hjust = 1))
   }
 
-
-  return(plot)
-
+  return(
+    if (compact_plots) {
+      # Strip plot of environment or other extraneous elements
+      # https://stackoverflow.com/a/77373906/2449926
+      plot |>
+        ggplotGrob() |>
+        ggpubr::as_ggplot()
+    } else {
+      plot
+    }
+  )
 }
 
 
-# Downsample x and y rows to match a target sample size while respecting specified
-# intervals in the random sample
+# Downsample x and y rows for a rug plot to match a target sample size
+# while respecting specified intervals in the random sample
 #
 # Not exported. Rug plots are slow with large datasets because each data point
-# must be plotted. `rug_sample` tries to resolve this issue by sampling
-# `rug_sample_size` rows of data maximum (only if the data has more than that
+# must be plotted. [rug_sample()] tries to resolve this issue by sampling
+# `rug_sample_size` rows of data at the most (only if the data has more than that
 # number of lines lines). However, to be representative, the sampling must have
 # at least min_rug_per_interval in each ale_x interval.
 #
 # @param x_y dataframe with two columns: rug_x (any basic datatype) and rug_y (numeric)
 # @param ale_x numeric vector. ale_x intervals. Rug plots are only valid for
 # numeric x types.
-# @param rug_sample_size See documentation for `ale`
-# @param min_rug_per_interval See documentation for `ale`
-# @param seed See documentation for `ale`
+# @param rug_sample_size See documentation for [ale()]
+# @param min_rug_per_interval See documentation for [ale()]
+# @param seed See documentation for [ale()]
 #
 rug_sample <- function(
     x_y,
-    ale_x,
+    x_intervals,
+    y_intervals = NULL,
     rug_sample_size = 500,
     min_rug_per_interval = 1,
     seed = 0
 ) {
-  # Hack to prevent devtools::check from thinking that NSE variables are global:
-  # Make them null local variables within the function with the issues. So,
-  # when NSE applies, the NSE variables will be prioritized over these null
-  # local variables.
-  rug_x <- NULL
-  rug_y <- NULL
-  interval <- NULL
 
   # Only sample small datasets
   if (nrow(x_y) <= rug_sample_size) {
@@ -492,32 +532,38 @@ rug_sample <- function(
   x_y <- x_y |>
     mutate(
       row = row_number(),
-      # Specify ale_x interval for each x value
-      interval = findInterval(rug_x, ale_x)
+      # Specify intervals for each x- and y-axis value
+      x_interval = findInterval(.data$rug_x, x_intervals |> sort()),
+      # Note: if y_intervals = NULL, then the intervals are all 0 and the code still works
+      y_interval = findInterval(.data$rug_y, y_intervals |> sort()),
     ) |>
-    select(row, rug_x, interval, rug_y)
+    select('row', 'rug_x', 'x_interval', 'rug_y', 'y_interval')
 
   # rs_idxs: row indexes of the rug sample
-  # First, ensure there are at least min_rug_per_interval rows selected per interval.
+  # First, ensure there are at least min_rug_per_interval rows
+  # selected per x_interval and y_interval.
   set.seed(seed)
   rs_idxs <-
     x_y |>
     summarize(
-      .by = interval,
+      .by = c('x_interval', 'y_interval'),
       row = sample(row, min_rug_per_interval)
     ) |>
     pull(row)
 
-  # Next, add a sample of all the other rows to meet the rug_sample_size target.
-  rs_idxs <- c(
+  if (length(rs_idxs) < rug_sample_size) {
+  # Add a sample of all the other rows to meet the rug_sample_size target.
+    rs_idxs <- c(
     rs_idxs,
     setdiff(x_y$row, rs_idxs) |>  # don't duplicate any rows already selected
       sample(rug_sample_size - length(rs_idxs))  # only sample enough to match rug_sample_size
   )
+  }
+
 
   return(
     x_y[rs_idxs, ] |>
-      select(rug_x, rug_y)
+      select('rug_x', 'rug_y')
   )
 }
 
@@ -527,54 +573,50 @@ plot_effects <- function(
     estimates,
     y_vals,
     y_col,
-    median_band = 0.05
+    middle_band,
+    compact_plots = FALSE
 ) {
 
-  # Hack to prevent devtools::check from thinking that NSE variables are global:
-  # Make them null local variables within the function with the issues. So,
-  # when NSE applies, the NSE variables will be prioritized over these null
-  # local variables.
-  # ale_data <- NULL
-  term <- NULL
-  naled <- NULL
-  aler_min <- NULL
-  aler_max <- NULL
-  aled <- NULL
+  # Create deciles for NALED and NALER axis
+  norm_deciles <-
+    y_vals |>
+    quantile(seq(0, 1, 0.1)) |>
+    stats::setNames(seq(-50, 50, 10) |> paste0('%'))
 
-
-  y_deciles <- quantile(y_vals, seq(0, 1, 0.1))
-  # median_y <- median(y_vals)
-
-  # Determine key points for the median band
-  median_band_quantiles <- quantile(
+  # Determine key points for the middle_band: naled_band or median_band
+  middle_band_quantiles <- quantile(
     y_vals, c(
-      0.5 - (median_band / 2),
+      # effects plot only uses the inner median band
+      0.5 - (middle_band[1] / 2),
       0.5,
-      0.5 + (median_band / 2)
+      0.5 + (middle_band[1] / 2)
     )
   )
-  median_band_lo <- median_band_quantiles[1]
-  median_y       <- median_band_quantiles[2]
-  median_band_hi <- median_band_quantiles[3]
+  middle_band_lo <- middle_band_quantiles[1]
+  median_y       <- middle_band_quantiles[2]
+  middle_band_hi <- middle_band_quantiles[3]
 
   # ALED and NALED should be centred not on the median, but on the middle of the
   # median band. This is visually more intuitive.
-  median_band_mid <- (median_band_lo + median_band_hi) / 2
+  middle_band_mid <- (middle_band_lo + middle_band_hi) / 2
 
-
-  # Sort estimates by naled and convert term to an ordered factor for proper sorting.
+  # Sort estimates by ALED and convert term to an ordered factor for proper sorting.
+  # NALED sometimes gives unusual values because of the normalization.
   # This must be done in two steps to access the correctly sorted estimates$term.
   estimates <- estimates |>
-    arrange(naled)
+    arrange(.data$aled, .data$naled)
   estimates <- estimates |>
-      mutate(term = factor(term, ordered = TRUE, levels = estimates$term))
+    mutate(term = factor(.data$term, ordered = TRUE, levels = .data$term))
 
   plot <-
     estimates |>
-    ggplot(aes(y = term)) +
+    ggplot(aes(y = .data$term)) +
     theme_bw() +
-    ylab(NULL) +
-    # Set the outcome (y) variable on the x axis
+    labs(
+      y = NULL,
+      alt = glue('ALE effects plot for {y_col}')
+    ) +
+  # Set the outcome (y) variable on the x axis
     scale_x_continuous(
       name = paste0(y_col, ' (ALER and ALED)'),
       # Set allowable data limits to extremes of either y_vals or ALER
@@ -594,10 +636,10 @@ plot_effects <- function(
           round_dp()
       },
       # Use decile for minor breaks
-      minor_breaks = y_deciles |> round_dp() |> as.numeric(),
+      minor_breaks = norm_deciles,
       sec.axis = dup_axis(
         name = paste0('Percentiles of ', y_col, ' (NALER and NALED)'),
-        breaks = y_deciles,
+        breaks = norm_deciles,
       )
     ) +
     # Even if the ALE values are extreme, zoom in to natural Y value limits
@@ -608,8 +650,8 @@ plot_effects <- function(
     ) +
     # Plot the median band: the average ± the confidence limits
     geom_rect(
-      xmin = median_band_lo,
-      xmax = median_band_hi,
+      xmin = middle_band_lo,
+      xmax = middle_band_hi,
       ymin = -Inf,
       ymax = Inf,
       fill = 'lightgray'
@@ -617,37 +659,38 @@ plot_effects <- function(
     # ALER/NALER bands as error bars
     geom_errorbarh(
       aes(
-        xmin = median_y + aler_min,
-        xmax = median_y + aler_max
+        xmin = median_y + .data$aler_min,
+        xmax = median_y + .data$aler_max
       ),
+      na.rm = TRUE,
       height = 0.25
     ) +
     # ALED/NALED as annotated text above and below white box
     geom_rect(
       aes(
-        xmin = median_band_mid - (aled / 2),
-        xmax = median_band_mid + (aled / 2),
-        ymin = as.integer(as.factor(term)) - 0.3,
-        ymax = as.integer(as.factor(term)) + 0.3,
+        xmin = middle_band_mid - (.data$aled / 2),
+        xmax = middle_band_mid + (.data$aled / 2),
+        ymin = as.integer(as.factor(.data$term)) - 0.3,
+        ymax = as.integer(as.factor(.data$term)) + 0.3,
       ),
       fill = 'white'
     ) +
     geom_text(
-      aes(label = paste0('NALED ', format(round_dp(naled)), '%'), x = median_band_mid),
+      aes(label = paste0('NALED ', format(round_dp(.data$naled)), '%'), x = middle_band_mid),
       size = 3, vjust = -1
     ) +
     # Use ( ) as the demarcators of the plot.
     # This visualization should not be confused with a box plot.
     geom_text(
-      aes(label = '(', x = median_band_mid - (aled / 2)),
+      aes(label = '(', x = middle_band_mid - (.data$aled / 2)),
       nudge_y = 0.02
     ) +
     geom_text(
-      aes(label = ')', x = median_band_mid + (aled / 2)),
+      aes(label = ')', x = middle_band_mid + (.data$aled / 2)),
       nudge_y = 0.02
     ) +
     geom_text(
-      aes(label = paste0('ALED ', format(round_dp(aled))), x = median_band_mid),
+      aes(label = paste0('ALED ', format(round_dp(.data$aled))), x = middle_band_mid),
       size = 3, vjust = 2
     ) +
     # annotation to explain symbols
@@ -664,5 +707,15 @@ plot_effects <- function(
       label.size = 0
     )
 
-  return(plot)
+  return(
+    if (compact_plots) {
+      # Strip plot of environment or other extraneous elements
+      # https://stackoverflow.com/a/77373906/2449926
+      plot |>
+        ggplotGrob() |>
+        ggpubr::as_ggplot()
+    } else {
+      plot
+    }
+  )
 }

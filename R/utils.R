@@ -1,6 +1,43 @@
 # utils.R miscellaneous internal utility functions
 
 
+
+
+# Mathematical operations ------------
+
+# # Calculate the mode(s) of a vector
+# #
+# # modes(c(1, 2, 3, 3, 4, 4, 5))
+# # modes(c(TRUE, TRUE, FALSE, TRUE, FALSE, FALSE))
+# # modes(factor(c("apple", "banana", "apple", "cherry", "cherry", "banana", "banana")))
+# modes <- function(x) {
+#   class_x <- class(x)[1]
+#
+#   freq_table <- table(x)
+#   max_freq <- max(freq_table)
+#
+#   # Extract the mode(s)
+#   m <- names(freq_table[freq_table == max_freq])
+#
+#   # Assign class of the mode(s) to class of x
+#   if (class_x %in% c('factor', 'ordered')) {
+#     m <- factor(
+#       m,
+#       levels = levels(x),
+#       ordered = is.ordered(x)
+#     )
+#   } else {
+#     m <- methods::as(m, class_x)
+#   }
+#
+#   # Returning the mode(s)
+#   return(m)
+# }
+
+
+
+# Miscellaneous ------------
+
 #  Determine the datatype of a vector
 #
 #  Not exported. See @returns for details of what it does.
@@ -35,36 +72,6 @@ var_type <- function(var) {
 }
 
 
-
-# Rename assertthat::is.count to accurately match what it actually specifies:
-# TRUE if x is a natural number (positive integer, zero excluded)
-is.natural <- function(x) {
-  assertthat::is.count(x)
-}
-
-# TRUE if x is a whole number (non-negative integer, zero included)
-# extend assertthat::is.count to accept 0 as valid
-is.whole <- function(x) {
-  assertthat::is.count(x) || x == 0
-}
-
-
-# Prevent usage of the ambiguous assertthat::is.count
-is.count <- function(x) {
-  stop('`is.count` is ambiguous. ',
-       'Instead, use `is.whole` for non-negative integer counts (including 0) or ',
-       '`is.natural` for positive whole numbers (excluding 0).')
-}
-
-
-# # Tests
-# is.whole('dodo')
-# is.whole(0)
-# is.count(10)
-# assertthat::is.count('dodo')
-# assertthat::is.count(0)
-
-
 # Round a numeric vector to an intuitive number of decimal places:
 # ranging from 0 when abs(max(x)) > 100 to 3 when abs(max(x)) < 1
 round_dp <- function(x) {
@@ -81,31 +88,3 @@ round_dp <- function(x) {
   round(x, dp)
 }
 
-# Calculate the mode(s) of a vector
-#
-# modes(c(1, 2, 3, 3, 4, 4, 5))
-# modes(c(TRUE, TRUE, FALSE, TRUE, FALSE, FALSE))
-# modes(factor(c("apple", "banana", "apple", "cherry", "cherry", "banana", "banana")))
-modes <- function(x) {
-  class_x <- class(x)[1]
-
-  freq_table <- table(x)
-  max_freq <- max(freq_table)
-
-  # Extract the mode(s)
-  m <- names(freq_table[freq_table == max_freq])
-
-  # Assign class of the mode(s) to class of x
-  if (class_x %in% c('factor', 'ordered')) {
-    m <- factor(
-      m,
-      levels = levels(x),
-      ordered = is.ordered(x)
-    )
-  } else {
-    m <- methods::as(m, class_x)
-  }
-
-  # Returning the mode(s)
-  return(m)
-}

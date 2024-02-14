@@ -6,8 +6,12 @@
 \usage{
 model_bootstrap(
   data,
-  model_call_string,
+  model,
   ...,
+  model_call_string = NULL,
+  model_call_string_vars = character(),
+  parallel = parallel::detectCores(logical = FALSE) - 1,
+  model_packages = as.character(NA),
   boot_it = 100,
   seed = 0,
   boot_alpha = 0.05,
@@ -16,20 +20,36 @@ model_bootstrap(
   ale_options = list(),
   tidy_options = list(),
   glance_options = list(),
+  compact_plots = FALSE,
   silent = FALSE
 )
 }
 \arguments{
 \item{data}{dataframe. Dataset that will be bootstrapped.}
 
-\item{model_call_string}{character. Character string of the full call for the model,
-except that the data option must be left out. The data option will be replaced with the \code{data} argument.}
+\item{model}{See documentation for \code{\link[=ale]{ale()}}}
 
 \item{...}{not used. Inserted to require explicit naming of subsequent arguments.}
 
+\item{model_call_string}{character string. If NULL, \code{\link[=model_bootstrap]{model_bootstrap()}} tries to
+automatically detect and construct the call for bootstrapped datasets. If it cannot, the
+function will fail early. In that case, a character string of the full call
+for the model must be provided that includes \code{boot_data} as the data argument for the call.
+See examples.}
+
+\item{model_call_string_vars}{character. Character vector of names of variables
+included in \code{model_call_string} that are not columns in \code{data}.
+If any such variables exist, they must be specified here or else parallel processing
+will produce an error. If parallelization is disabled with \code{parallel = 0},
+then this is not a concern.}
+
+\item{parallel}{See documentation for \code{\link[=ale]{ale()}}}
+
+\item{model_packages}{See documentation for \code{\link[=ale]{ale()}}}
+
 \item{boot_it}{integer from 0 to Inf. Number of bootstrap iterations.
 If boot_it = 0, then the model is run as normal once on the full \code{data} with
-no bootstrap.}
+no bootstrapping.}
 
 \item{seed}{integer. Random seed. Supply this between runs to assure identical
 bootstrap samples are generated each time on the same data.}
@@ -38,7 +58,7 @@ bootstrap samples are generated each time on the same data.}
 1 - boot_alpha. For example, the default 0.05 will give a 95\% confidence
 interval, that is, from the 2.5\% to the 97.5\% percentile.}
 
-\item{boot_centre}{See documentation for \code{ale}}
+\item{boot_centre}{See See documentation for \code{\link[=ale]{ale()}}}
 
 \item{output}{character vector. Which types of bootstraps to calculate and return:
 \itemize{
@@ -51,34 +71,37 @@ except if included in this \code{output} argument.
 }}
 
 \item{ale_options, tidy_options, glance_options}{list of named arguments.
-Arguments to pass to the \code{ale}, \code{broom::tidy}, or \code{broom::glance} functions, respectively,
-beyond (or overriding) the defaults.}
+Arguments to pass to the \code{\link[=ale]{ale()}}, \code{\link[broom:reexports]{broom::tidy()}}, or \code{\link[broom:reexports]{broom::glance()}} functions, respectively,
+beyond (or overriding) the defaults. In particular, to obtain p-values for ALE
+statistics, see the details.}
 
-\item{silent}{See documentation for \code{ale}}
+\item{compact_plots}{See documentation for \code{\link[=ale]{ale()}}}
+
+\item{silent}{See documentation for \code{\link[=ale]{ale()}}}
 }
 \value{
 list with tibbles of the following elements (depending on values requested in
 the \code{output} argument:
 \itemize{
-\item model_stats: bootstrapped results from \code{broom::glance}
-\item model_coefs: bootstrapped results from \code{broom::tidy}
+\item model_stats: bootstrapped results from \code{\link[broom:reexports]{broom::glance()}}
+\item model_coefs: bootstrapped results from \code{\link[broom:reexports]{broom::tidy()}}
 \item ale: bootstrapped ALE results
 \itemize{
-\item data: ALE data (see \code{ale} for details about the format)
+\item data: ALE data (see \code{\link[=ale]{ale()}} for details about the format)
 \item stats: ALE statistics. The same data is duplicated with different views
 that might be variously useful. The column
 \itemize{
 \item by_term: statistic, estimate, conf.low, median, mean, conf.high.
 ("term" means variable name.)
 The column names are compatible with the \code{broom} package. The confidence intervals
-are based on the \code{ale} function defaults; they can be changed with the
+are based on the \code{\link[=ale]{ale()}} function defaults; they can be changed with the
 \code{ale_options} argument. The estimate is the median or the mean, depending
 on the \code{boot_centre} argument.
 \item by_statistic: term, estimate, conf.low, median, mean, conf.high.
 \item estimate: term, then one column per statistic Provided with the default
 estimate. This view does not present confidence intervals.
 }
-\item plots: ALE plots (see \code{ale} for details about the format)
+\item plots: ALE plots (see \code{\link[=ale]{ale()}} for details about the format)
 }
 \item boot_data: full bootstrap data (not returned by default)
 \item other values: the \code{boot_it}, \code{seed}, \code{boot_alpha}, and \code{boot_centre} arguments that
@@ -90,16 +113,17 @@ Execute full model bootstrapping with ALE calculation on each bootstrap run
 }
 \details{
 No modelling results, with or without ALE, should be considered reliable without
-being bootstrapped.
-For large datasets with clear separation between training and testing samples,
-\code{ale} bootstraps the ALE results of the test data. However, when a dataset
-is too small to be subdivided into training and test sets, then the entire
-model should be bootstrapped. That is, multiple models should be trained,
-one on each bootstrap sample. The reliable results are the average results
-of all the bootstrap models, however many there are. For details, see
-the vignette on small datasets or the details and examples below.
+being bootstrapped. For large datasets, normally the model provided to \code{\link[=ale]{ale()}}
+is the final deployment model that has been validated and evaluated on
+training and testing on subsets; that is why \code{\link[=ale]{ale()}} is calculated on the full
+dataset. However, when a dataset is too small to be subdivided into training
+and test sets for a standard machine learning process, then the entire model
+should be bootstrapped. That is, multiple models should be trained, one on
+each bootstrap sample. The reliable results are the average results of all
+the bootstrap models, however many there are. For details, see the vignette
+on small datasets or the details and examples below.
 
-\code{model_bootstrap} automatically carries out full-model bootstrapping suitable
+\code{\link[=model_bootstrap]{model_bootstrap()}} automatically carries out full-model bootstrapping suitable
 for small datasets. Specifically, it:
 \itemize{
 \item Creates multiple bootstrap samples (default 100; the user can specify any number);
@@ -109,6 +133,20 @@ for each model on each bootstrap sample;
 \item Calculates the mean, median, and lower and upper confidence intervals for
 each of those values across all bootstrap samples.
 }
+
+\strong{P-values}
+The \code{\link[broom:reexports]{broom::tidy()}} summary statistics will provide p-values as normal, but the
+situation is somewhat complicated with p-values for ALE statistics. The challenge
+is that the procedure for obtaining their p-values is very slow: it involves
+retraining the model 1000 times. Thus, it is not efficient to calculate p-values
+on every execution of \code{model_bootstrap()}. Although the \code{\link[=ale]{ale()}} function provides
+an 'auto' option for creating p-values,
+that option is disabled in \code{model_bootstrap()} because it would be far too slow:
+it would involve retraining the model 1000 times the number of bootstrap iterations.
+Rather, you must first create a p-values function object using the procedure
+described in \code{help(create_p_funs)}. If the name of your p-values object is
+\code{p_funs}, you can then request p-values each time you run \code{model_bootstrap()}
+by passing it the argument \code{ale_options = list(p_values = p_funs)}.
 }
 \examples{
 
@@ -122,23 +160,38 @@ gam_attitude <- mgcv::gam(rating ~ complaints + privileges + s(learning) +
                           data = attitude)
 summary(gam_attitude)
 
+\donttest{
 # Full model bootstrapping
-# Only 3 bootstrap iterations for a rapid example; default is 100
+# Only 4 bootstrap iterations for a rapid example; default is 100
 # Increase value of boot_it for more realistic results
 mb_gam <- model_bootstrap(
   attitude,
-  'mgcv::gam(rating ~ complaints + privileges + s(learning) +
-               raises + s(critical) + advance)',
-  boot_it = 3
+  gam_attitude,
+  boot_it = 4,
+  parallel = 2  # CRAN limit (delete this line on your own computer)
+)
+
+# If the model is not standard, supply model_call_string with
+# 'data = boot_data' in the string (not as a direct argument to [model_bootstrap()])
+mb_gam <- model_bootstrap(
+  attitude,
+  gam_attitude,
+  model_call_string = 'mgcv::gam(
+    rating ~ complaints + privileges + s(learning) +
+      raises + s(critical) + advance,
+    data = boot_data
+  )',
+  boot_it = 4,
+  parallel = 2  # CRAN limit (delete this line on your own computer)
 )
 
 # Model statistics and coefficients
 mb_gam$model_stats
 mb_gam$model_coefs
 
-\donttest{
 # Plot ALE
-gridExtra::grid.arrange(grobs = mb_gam$ale$plots, ncol = 2)
+mb_gam$ale$plots |>
+  patchwork::wrap_plots()
 }
 
 

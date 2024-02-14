@@ -4,7 +4,7 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 
-## ----setup--------------------------------------------------------------------
+## ----load libraries-----------------------------------------------------------
 library(ale)
 library(dplyr)
 
@@ -20,29 +20,45 @@ cm <- mgcv::gam(mpg ~ cyl + disp + hp + drat + wt + s(qsec) +
                 data = var_cars)
 summary(cm)
 
+## ----enable progressr, eval = FALSE-------------------------------------------
+#  # Run this in an R console; it will not work directly within an R Markdown or Quarto block
+#  progressr::handlers(global = TRUE)
+#  progressr::handlers('cli')
+
 ## ----cars_ale, fig.width=7, fig.height=14-------------------------------------
-cars_ale <- ale(var_cars, cm)
+cars_ale <- ale(
+  var_cars, cm,
+  parallel = 2  # CRAN limit (delete this line on your own computer)
+)
 
 # Print all plots
-gridExtra::grid.arrange(grobs = cars_ale$plots, ncol = 2)
+cars_ale$plots |> 
+  patchwork::wrap_plots(ncol = 2)
 
 ## ----cars_ale_ixn, fig.width=7, fig.height=7----------------------------------
-cars_ale_ixn <- ale_ixn(var_cars, cm)
+cars_ale_ixn <- ale_ixn(
+  var_cars, cm,
+  parallel = 2  # CRAN limit (delete this line on your own computer)
+)
 
 # Print plots
 cars_ale_ixn$plots |>
-  purrr::walk(\(.x1) {  # extract list of x1 ALE outputs
-    gridExtra::grid.arrange(grobs = .x1, ncol = 2)  # plot all x1 plots
+  # extract list of x1 ALE outputs
+  purrr::walk(\(.x1) {  
+    # plot all x2 plots in each .x1 element
+    patchwork::wrap_plots(.x1, ncol = 2) |> 
+      print()
   })
 
 ## ----cars_full, fig.width=7, fig.height=14------------------------------------
 mb <- model_bootstrap(
   var_cars, 
-  'mgcv::gam(mpg ~ cyl + disp + hp + drat + wt + s(qsec) +
-               vs + am + gear + carb + country)',
+  cm,
   boot_it = 10,  # 100 by default but reduced here for a faster demonstration
-  silent = TRUE  # progress bars disabled for the vignette
+  parallel = 2,  # CRAN limit (delete this line on your own computer)
+  seed = 2  # workaround to avoid random error on such a small dataset
 )
 
-gridExtra::grid.arrange(grobs = mb$ale$plots, ncol = 2)
+mb$ale$plots |> 
+  patchwork::wrap_plots(ncol = 2)
 

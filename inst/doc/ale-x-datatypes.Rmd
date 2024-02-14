@@ -1,7 +1,7 @@
 ---
 title: "ale function handling of various datatypes for x"
 author: "Chitu Okoli"
-date: "`r Sys.Date()`"
+date: "January 9, 2024"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{ale function handling of various datatypes for x}
@@ -16,12 +16,14 @@ knitr::opts_chunk$set(
 )
 ```
 
-```{r setup}
+This vignette demonstrates how `ale` works for various datatypes of input (x) values. You should first read the [introductory vignette](ale-intro.html "Introduction to the ale package") that explains general functionality of the package; this vignette is a demonstration of specific functionality.
+
+We begin by loading the necessary libraries.
+
+```{r load libraries}
 library(ale)
 library(dplyr)
 ```
-
-This vignette demonstrates how `ale` works for various datatypes of input (x) values. You should first read the [introductory vignette](ale-intro.html "Introduction to the ale package") that explains general functionality of the package; this vignette is a demonstration of specific functionality.
 
 ## `var_cars`: modified `mtcars` dataset (Motor Trend Car Road Tests)
 
@@ -64,13 +66,27 @@ cm <- mgcv::gam(mpg ~ cyl + disp + hp + drat + wt + s(qsec) +
 summary(cm)
 ```
 
+Before starting, we recommend that you enable progress bars to see how long procedures will take. Simply run the following code at the beginning of your R session:
+
+```{r enable progressr, eval = FALSE}
+# Run this in an R console; it will not work directly within an R Markdown or Quarto block
+progressr::handlers(global = TRUE)
+progressr::handlers('cli')
+```
+
+If you forget to do that, the `{ale}` package will do it automatically for you with a notification message.
+
 Now we generate ALE data from the `var_cars` GAM model and plot it.
 
 ```{r cars_ale, fig.width=7, fig.height=14}
-cars_ale <- ale(var_cars, cm)
+cars_ale <- ale(
+  var_cars, cm,
+  parallel = 2  # CRAN limit (delete this line on your own computer)
+)
 
 # Print all plots
-gridExtra::grid.arrange(grobs = cars_ale$plots, ncol = 2)
+cars_ale$plots |> 
+  patchwork::wrap_plots(ncol = 2)
 ```
 
 We can see that `ale` has no trouble modelling any of the datatypes in our sample (logical, factor, ordered, integer, or double). It plots line charts for the numeric predictors and column charts for everything else. 
@@ -80,31 +96,38 @@ The numeric predictors have rug plots that indicate in which ranges of the x (pr
 We can also generate and plot the ALE data for all two-way interactions.
 
 ```{r cars_ale_ixn, fig.width=7, fig.height=7}
-cars_ale_ixn <- ale_ixn(var_cars, cm)
+cars_ale_ixn <- ale_ixn(
+  var_cars, cm,
+  parallel = 2  # CRAN limit (delete this line on your own computer)
+)
 
 # Print plots
 cars_ale_ixn$plots |>
-  purrr::walk(\(.x1) {  # extract list of x1 ALE outputs
-    gridExtra::grid.arrange(grobs = .x1, ncol = 2)  # plot all x1 plots
+  # extract list of x1 ALE outputs
+  purrr::walk(\(.x1) {  
+    # plot all x2 plots in each .x1 element
+    patchwork::wrap_plots(.x1, ncol = 2) |> 
+      print()
   })
 ```
 
-There are no interactions in this dataset. (To see what ALE interaction plots look like in the presence of interactions, see the [ALEPlot comparison vignette](ale-ALEPlot.html), which explains the interaction plots in more detail.)
+There are no interactions in this dataset. (To see what ALE interaction plots look like in the presence of interactions, see the [{ALEPlot} comparison vignette](https://tripartio.github.io/ale/articles/ale-ALEPlot.html), which explains the interaction plots in more detail.)
 
 Finally, as explained in the vignette on modelling with [small datasets](ale-small-datasets.html "ale package for small datasets"), a more appropriate modelling workflow would require bootstrapping the entire model, not just the ALE data. So, let's do that now.
 
 ```{r cars_full, fig.width=7, fig.height=14}
 mb <- model_bootstrap(
   var_cars, 
-  'mgcv::gam(mpg ~ cyl + disp + hp + drat + wt + s(qsec) +
-               vs + am + gear + carb + country)',
+  cm,
   boot_it = 10,  # 100 by default but reduced here for a faster demonstration
-  silent = TRUE  # progress bars disabled for the vignette
+  parallel = 2,  # CRAN limit (delete this line on your own computer)
+  seed = 2  # workaround to avoid random error on such a small dataset
 )
 
-gridExtra::grid.arrange(grobs = mb$ale$plots, ncol = 2)
+mb$ale$plots |> 
+  patchwork::wrap_plots(ncol = 2)
 ```
 
-(By default, `model_bootstrap` creates 100 bootstrap samples but, so that this illustration runs faster, we demonstrate it here with only 10 iterations.) 
+(By default, `model_bootstrap()` creates 100 bootstrap samples but, so that this illustration runs faster, we demonstrate it here with only 10 iterations.) 
 
 With such a small dataset, the bootstrap confidence interval always overlap with the middle band, indicating that this dataset cannot support any claims that any of its variables has a meaningful effect on fuel efficiency (mpg). Considering that the average bootstrapped ALE values suggest various intriguing patterns, the problem is no doubt that the dataset is too small--if more data were collected and analyzed, some of the patterns would probably be confirmed.

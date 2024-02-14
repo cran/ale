@@ -4,8 +4,8 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 
-## ----libraries----------------------------------------------------------------
-library(mgcv)  # for datasets and for gam function
+## ----load libraries-----------------------------------------------------------
+library(mgcv)   # for datasets and the gam function
 library(dplyr)  # for data manipulation
 library(ale)
 
@@ -64,72 +64,128 @@ glimpse(math)
 ## ----y summary----------------------------------------------------------------
 summary(math$math_avg)
 
-## ----model bootstrap----------------------------------------------------------
-mb_gam <- model_bootstrap(
-  math, 
-  'gam(
+## ----enable progressr, eval = FALSE-------------------------------------------
+#  # Run this in an R console; it will not work directly within an R Markdown or Quarto block
+#  progressr::handlers(global = TRUE)
+#  progressr::handlers('cli')
+
+## ----train gam model----------------------------------------------------------
+gam_math <- gam(
      math_avg ~ public + high_minority +
      s(size) + s(academic_ratio) + s(female_ratio) + s(mean_ses) + 
-     s(minority_ratio) + s(discrim) + s(rand_norm)
-   )',
+     s(minority_ratio) + s(discrim) + s(rand_norm),
+     data = math
+   )
+
+gam_math
+
+## ----p_funs-------------------------------------------------------------------
+# # To generate the code, uncomment the following lines.
+# # But it is slow because it retrains the model 1000 times,
+# # so this vignette loads a pre-created p-values object.
+# gam_math_p_funs <- create_p_funs(
+#   math,
+#   gam_math
+# )
+# saveRDS(gam_math_p_funs, file.choose())
+gam_math_p_funs <- url('https://github.com/tripartio/ale/raw/main/download/gam_math_p_funs.rds') |> 
+  readRDS()
+
+## ----model bootstrap----------------------------------------------------------
+mb_gam_math <- model_bootstrap(
+  math, 
+  gam_math,
+  # Pass the p_funs object so that p-values will be generated
+  ale_options = list(p_values = gam_math_p_funs),
   # For the GAM model coefficients, show details of all variables, parametric or not
   tidy_options = list(parametric = TRUE),
   # tidy_options = list(parametric = NULL),
   boot_it = 40,  # 100 by default but reduced here for a faster demonstration
-  silent = TRUE  # progress bars disabled for the vignette
+  parallel = 2  # CRAN limit (delete this line on your own computer for faster speed)
 )
 
 ## ----model_stats--------------------------------------------------------------
-mb_gam$model_stats
+mb_gam_math$model_stats
 
 ## ----model_coefs--------------------------------------------------------------
-mb_gam$model_coefs
+mb_gam_math$model_coefs
 
 ## ----model_coefs stat sig variables-------------------------------------------
-mb_gam$model_coefs |> 
+mb_gam_math$model_coefs |> 
   # filter is TRUE if conf.low and conf.high are both positive or both negative because
   # multiplying two numbers of the same sign results in a positive number.
   filter((conf.low * conf.high) > 0)
 
-## ----all ALE plots, fig.width=7, fig.height=10--------------------------------
-gridExtra::grid.arrange(grobs = mb_gam$ale$plots, ncol = 2)
+## ----all-ALE-plots, fig.width=7, fig.height=10--------------------------------
+mb_gam_math$ale$plots |> 
+  patchwork::wrap_plots(ncol = 2)
 
-## ----ALE effects plot, fig.width=8, fig.height=6------------------------------
-mb_gam$ale$stats$effects_plot
+## ----model-bootstrap-without-p_funs, fig.width=7, fig.height=10---------------
+mb_gam_no_p <- model_bootstrap(
+  math, 
+  gam_math,
+  # For the GAM model coefficients, show details of all variables, parametric or not
+  tidy_options = list(parametric = TRUE),
+  # tidy_options = list(parametric = NULL),
+  boot_it = 40,  # 100 by default but reduced here for a faster demonstration
+  parallel = 2  # CRAN limit (delete this line on your own computer)
+)
+
+mb_gam_no_p$ale$plots |> 
+  patchwork::wrap_plots(ncol = 2)
+
+## ----ALE-effects-plot, fig.width=8, fig.height=6------------------------------
+mb_gam_math$ale$stats$effects_plot
+
+## ----ALE-plot-for-public-1----------------------------------------------------
+mb_gam_math$ale$plots$public
 
 ## ----ALE stats for public-----------------------------------------------------
-mb_gam$ale$stats$by_term$public
+mb_gam_math$ale$stats$by_term$public
+
+## ----ALE-plot-forl-academic_ratio-1-------------------------------------------
+mb_gam_math$ale$plots$academic_ratio
 
 ## ----ALE stats for academic_ratio---------------------------------------------
-mb_gam$ale$stats$by_term$academic_ratio
+mb_gam_math$ale$stats$by_term$academic_ratio
+
+## ----math-rand_norm-ALE-plot, fig.width=3.5, fig.height=3---------------------
+mb_gam_math$ale$plots$rand_norm
 
 ## ----ALE stats for rand_norm--------------------------------------------------
-mb_gam$ale$stats$by_term$rand_norm
+mb_gam_math$ale$stats$by_term$rand_norm
 
 ## ----ale data for public------------------------------------------------------
-mb_gam$ale$data$public
+mb_gam_math$ale$data$public
 
 ## ----ale data for academic_ratio----------------------------------------------
-mb_gam$ale$data$academic_ratio
+mb_gam_math$ale$data$academic_ratio
 
-## ----ALE plot for academic_ratio----------------------------------------------
-mb_gam$ale$plots$academic_ratio
+## ----ALE-plot-for-mean_ses----------------------------------------------------
+mb_gam_math$ale$plots$mean_ses
 
-## ----conf_regions for academic_ratio------------------------------------------
-mb_gam$ale$conf_regions$academic_ratio
+## ----conf_regions for mean_ses------------------------------------------------
+mb_gam_math$ale$conf_regions$by_term$mean_ses
 
-## ----text conf_regions for academic_ratio-------------------------------------
-ale:::summarize_conf_regions_in_words(mb_gam$ale$conf_regions$academic_ratio)
+## ----text conf_regions for mean_ses-------------------------------------------
+ale:::summarize_conf_regions_in_words(mb_gam_math$ale$conf_regions$by_term$mean_ses)
 
-## ----ALE plot for public------------------------------------------------------
-mb_gam$ale$plots$public
+## ----ALE-plot-for-public-2----------------------------------------------------
+mb_gam_math$ale$plots$public
 
 ## ----conf_regions for public--------------------------------------------------
-mb_gam$ale$conf_regions$public
+mb_gam_math$ale$conf_regions$by_term$public
 
-## ----ALE plot for rand_norm---------------------------------------------------
-mb_gam$ale$plots$rand_norm
+## ----ALE-plot-for-rand_norm---------------------------------------------------
+mb_gam_math$ale$plots$rand_norm
 
 ## ----conf_regions for rand_norm-----------------------------------------------
-mb_gam$ale$conf_regions$rand_norm
+mb_gam_math$ale$conf_regions$by_term$rand_norm
+
+## ----significant conf_regions-------------------------------------------------
+mb_gam_math$ale$conf_regions$significant
+
+## ----variables with significant conf_regions----------------------------------
+mb_gam_math$ale$conf_regions$significant$term |> 
+  unique()
 

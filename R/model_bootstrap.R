@@ -4,16 +4,17 @@
 #' Execute full model bootstrapping with ALE calculation on each bootstrap run
 #'
 #' No modelling results, with or without ALE, should be considered reliable without
-#' being bootstrapped.
-#'  For large datasets with clear separation between training and testing samples,
-#'  `ale` bootstraps the ALE results of the test data. However, when a dataset
-#'  is too small to be subdivided into training and test sets, then the entire
-#'   model should be bootstrapped. That is, multiple models should be trained,
-#'    one on each bootstrap sample. The reliable results are the average results
-#'     of all the bootstrap models, however many there are. For details, see
-#'  the vignette on small datasets or the details and examples below.
+#' being bootstrapped. For large datasets, normally the model provided to [ale()]
+#' is the final deployment model that has been validated and evaluated on
+#' training and testing on subsets; that is why [ale()] is calculated on the full
+#' dataset. However, when a dataset is too small to be subdivided into training
+#' and test sets for a standard machine learning process, then the entire model
+#' should be bootstrapped. That is, multiple models should be trained, one on
+#' each bootstrap sample. The reliable results are the average results of all
+#' the bootstrap models, however many there are. For details, see the vignette
+#' on small datasets or the details and examples below.
 #'
-#' `model_bootstrap` automatically carries out full-model bootstrapping suitable
+#' [model_bootstrap()] automatically carries out full-model bootstrapping suitable
 #' for small datasets. Specifically, it:
 #'
 #' * Creates multiple bootstrap samples (default 100; the user can specify any number);
@@ -23,6 +24,20 @@
 #' * Calculates the mean, median, and lower and upper confidence intervals for
 #'  each of those values across all bootstrap samples.
 #'
+#'  **P-values**
+#'  The [broom::tidy()] summary statistics will provide p-values as normal, but the
+#'  situation is somewhat complicated with p-values for ALE statistics. The challenge
+#'  is that the procedure for obtaining their p-values is very slow: it involves
+#'  retraining the model 1000 times. Thus, it is not efficient to calculate p-values
+#'  on every execution of `model_bootstrap()`. Although the [ale()] function provides
+#'  an 'auto' option for creating p-values,
+#'  that option is disabled in `model_bootstrap()` because it would be far too slow:
+#'  it would involve retraining the model 1000 times the number of bootstrap iterations.
+#'  Rather, you must first create a p-values function object using the procedure
+#'  described in `help(create_p_funs)`. If the name of your p-values object is
+#'  `p_funs`, you can then request p-values each time you run `model_bootstrap()`
+#'  by passing it the argument `ale_options = list(p_values = p_funs)`.
+#'
 #' @export
 #'
 #' @references Okoli, Chitu. 2023.
@@ -31,22 +46,33 @@
 #'
 #'
 #' @param data dataframe. Dataset that will be bootstrapped.
-#' @param model_call_string character. Character string of the full call for the model,
-#'  except that the data option must be left out. The data option will be replaced with the `data` argument.
+#' @param model See documentation for [ale()]
 #' @param ... not used. Inserted to require explicit naming of subsequent arguments.
+#' @param model_call_string character string. If NULL, [model_bootstrap()] tries to
+#' automatically detect and construct the call for bootstrapped datasets. If it cannot, the
+#' function will fail early. In that case, a character string of the full call
+#' for the model must be provided that includes `boot_data` as the data argument for the call.
+#' See examples.
 # Future arguments:
 # * y_col: name of y column in data. This would allow SD and MAD to be calculated.
-# * predict_call_string: allows the prediction function to be called; this would
+# * pred_fun,pred_type: allows the prediction function to be called; this would
 # allow bootstrapped RMSE, MAE, cross entropy, and AUC to be calculated.
+#' @param model_call_string_vars character. Character vector of names of variables
+#' included in `model_call_string` that are not columns in `data`.
+#' If any such variables exist, they must be specified here or else parallel processing
+#' will produce an error. If parallelization is disabled with `parallel = 0`,
+#' then this is not a concern.
+#' @param parallel See documentation for [ale()]
+#' @param model_packages See documentation for [ale()]
 #' @param boot_it integer from 0 to Inf. Number of bootstrap iterations.
 #' If boot_it = 0, then the model is run as normal once on the full `data` with
-#' no bootstrap.
+#' no bootstrapping.
 #' @param seed integer. Random seed. Supply this between runs to assure identical
 #' bootstrap samples are generated each time on the same data.
 #' @param boot_alpha numeric. The confidence level for the bootstrap confidence intervals is
 #' 1 - boot_alpha. For example, the default 0.05 will give a 95% confidence
 #' interval, that is, from the 2.5% to the 97.5% percentile.
-#' @param boot_centre See documentation for `ale`
+#' @param boot_centre See See documentation for [ale()]
 #' @param output character vector. Which types of bootstraps to calculate and return:
 #' * 'ale': Calculate and return bootstrapped ALE data and plot.
 #' * 'model_stats': Calculate and return bootstrapped overall model statistics.
@@ -55,28 +81,30 @@
 #' because it is needed for the bootstrap averages. By default, it is not returned
 #' except if included in this `output` argument.
 #' @param ale_options,tidy_options,glance_options list of named arguments.
-#' Arguments to pass to the `ale`, `broom::tidy`, or `broom::glance` functions, respectively,
-#' beyond (or overriding) the defaults.
-#' @param silent See documentation for `ale`
+#' Arguments to pass to the [ale()], [broom::tidy()], or [broom::glance()] functions, respectively,
+#' beyond (or overriding) the defaults. In particular, to obtain p-values for ALE
+#' statistics, see the details.
+#' @param compact_plots See documentation for [ale()]
+#' @param silent See documentation for [ale()]
 #'
 #' @return list with tibbles of the following elements (depending on values requested in
 #' the `output` argument:
-#' * model_stats: bootstrapped results from `broom::glance`
-#' * model_coefs: bootstrapped results from `broom::tidy`
+#' * model_stats: bootstrapped results from [broom::glance()]
+#' * model_coefs: bootstrapped results from [broom::tidy()]
 #' * ale: bootstrapped ALE results
-#'   * data: ALE data (see `ale` for details about the format)
+#'   * data: ALE data (see [ale()] for details about the format)
 #'   * stats: ALE statistics. The same data is duplicated with different views
 #'   that might be variously useful. The column
 #'     * by_term: statistic, estimate, conf.low, median, mean, conf.high.
 #'     ("term" means variable name.)
 #'     The column names are compatible with the `broom` package. The confidence intervals
-#'     are based on the `ale` function defaults; they can be changed with the
+#'     are based on the [ale()] function defaults; they can be changed with the
 #'     `ale_options` argument. The estimate is the median or the mean, depending
 #'     on the `boot_centre` argument.
 #'     * by_statistic: term, estimate, conf.low, median, mean, conf.high.
 #'     * estimate: term, then one column per statistic Provided with the default
 #'     estimate. This view does not present confidence intervals.
-#'   * plots: ALE plots (see `ale` for details about the format)
+#'   * plots: ALE plots (see [ale()] for details about the format)
 #' * boot_data: full bootstrap data (not returned by default)
 #' * other values: the `boot_it`, `seed`, `boot_alpha`, and `boot_centre` arguments that
 #' were originally passed are returned for reference.
@@ -93,23 +121,38 @@
 #'                           data = attitude)
 #' summary(gam_attitude)
 #'
+#' \donttest{
 #' # Full model bootstrapping
-#' # Only 3 bootstrap iterations for a rapid example; default is 100
+#' # Only 4 bootstrap iterations for a rapid example; default is 100
 #' # Increase value of boot_it for more realistic results
 #' mb_gam <- model_bootstrap(
 #'   attitude,
-#'   'mgcv::gam(rating ~ complaints + privileges + s(learning) +
-#'                raises + s(critical) + advance)',
-#'   boot_it = 3
+#'   gam_attitude,
+#'   boot_it = 4,
+#'   parallel = 2  # CRAN limit (delete this line on your own computer)
+#' )
+#'
+#' # If the model is not standard, supply model_call_string with
+#' # 'data = boot_data' in the string (not as a direct argument to [model_bootstrap()])
+#' mb_gam <- model_bootstrap(
+#'   attitude,
+#'   gam_attitude,
+#'   model_call_string = 'mgcv::gam(
+#'     rating ~ complaints + privileges + s(learning) +
+#'       raises + s(critical) + advance,
+#'     data = boot_data
+#'   )',
+#'   boot_it = 4,
+#'   parallel = 2  # CRAN limit (delete this line on your own computer)
 #' )
 #'
 #' # Model statistics and coefficients
 #' mb_gam$model_stats
 #' mb_gam$model_coefs
 #'
-#' \donttest{
 #' # Plot ALE
-#' gridExtra::grid.arrange(grobs = mb_gam$ale$plots, ncol = 2)
+#' mb_gam$ale$plots |>
+#'   patchwork::wrap_plots()
 #' }
 #'
 #'
@@ -124,10 +167,15 @@
 #'
 model_bootstrap <- function (
     data,
-    model_call_string,
+    model,
     ...,
+    model_call_string = NULL,
+    model_call_string_vars = character(),
+    parallel = parallel::detectCores(logical = FALSE) - 1,
+    model_packages = as.character(NA),
     # y_col,
-    # predict_call_string,
+    # pred_fun,
+    # pred_type,
     boot_it = 100,
     seed = 0,
     boot_alpha = 0.05,
@@ -136,20 +184,51 @@ model_bootstrap <- function (
     ale_options = list(),
     tidy_options = list(),
     glance_options = list(),
+    compact_plots = FALSE,
     silent = FALSE
 ) {
   # Validate arguments
   ellipsis::check_dots_empty()  # error if any unlisted argument is used (captured in ...)
 
   assert_that(data |> inherits('data.frame'))
-  assert_that(
-    is.string(model_call_string) &&
-      # There must be no data argument
-      stringr::str_detect(model_call_string, 'data = ', negate = TRUE) &&
-      stringr::str_detect(model_call_string, 'data=', negate = TRUE) &&
-      # model_call_string must terminate with ')'
-      (stringr::str_sub(model_call_string, start = -1) == ')')
-  )
+
+  # If model_call_string is not provided, ensure that
+  # the model allows automatic manipulation.
+  if (is.null(model_call_string)) {
+
+    # Automatically extract the call from the model
+    model_call <- insight::get_call(model)
+
+    assert_that(
+      !is.character(model),
+      # If there is no model_call_string and model is a character,
+      # then model was probably omitted and model_call_string might was
+      # mistakenly passed in the model argument position
+      msg = '"model" is a required argument.'
+    )
+
+    assert_that(
+      !is.null(model_call),
+      msg = glue::glue(
+        'The model call could not be automatically detected, so ',
+        'model_call_string must be provided. See help(model_bootstrap) ',
+        'for details.'
+      )
+    )
+  }
+  else {  # validate model_call_string
+    assert_that(is.string(model_call_string))
+    assert_that(
+      stringr::str_detect(model_call_string, 'boot_data'),
+      msg = glue::glue(
+        'The data argument for model_call_string must be "boot_data". ',
+        'See help(model_bootstrap) for details.'
+      )
+    )
+  }
+
+  model_packages <- validated_parallel_packages(parallel, model, model_packages)
+
   assert_that(is.whole(boot_it))
   assert_that(is.number(seed))
   assert_that(is.number(boot_alpha) && between(boot_alpha, 0, 1))
@@ -160,31 +239,28 @@ model_bootstrap <- function (
     msg = 'The value in the output argument must be one or more of
     "ale", "model_stats", or "model_coefs".'
   )
+
   assert_that(is.list(ale_options))
+  assert_that(
+    !(
+      !is.null(ale_options$p_values) &&
+        length(ale_options$p_values) == 1 &&
+        ale_options$p_values == 'auto'
+    ),
+    msg = paste0(
+      'The `ale_options` `p_values == "auto"` option is disabled for `model_bootstrap()` ',
+      'because it is far too slow. Rather, you must pass a p-values ',
+      'function object using the procedure described in `help(create_p_funs)`.'
+    )
+  )
   assert_that(is.list(tidy_options))
   assert_that(is.list(glance_options))
+
+  validate_silent(silent)
 
 
   n_rows <- nrow(data)
 
-  # Hack to prevent devtools::check from thinking that NSE variables are global:
-  # Make them null local variables within the function with the issues. So,
-  # when NSE applies, the NSE variables will be prioritized over these null
-  # local variables.
-  # ale_data <- NULL
-  ale_x <- NULL
-  ale_n <- NULL
-  ale_y <- NULL
-  ale_y_mean <- NULL
-  ale_y_median <- NULL
-  it <- NULL
-  name <- NULL
-  value <- NULL
-  term <- NULL
-  estimate <- NULL
-  statistic <- NULL
-  aled <- NULL
-  naler_max <- NULL
 
 
   # Create bootstrap tbl
@@ -196,8 +272,8 @@ model_bootstrap <- function (
     # row_idxs: row indexes of each bootstrap sample.
     # Store just the indexes rather than duplicating the entire dataset
     #   multiple times.
-    row_idxs = map(0:boot_it, \(it) {
-      if (it == 0) {  # row 0 is the full dataset without bootstrapping
+    row_idxs = map(0:boot_it, \(.it) {
+      if (.it == 0) {  # row 0 is the full dataset without bootstrapping
         1:n_rows
       } else {  # bootstrap: sample n_rows with replacement
         sample.int(n_rows, replace = TRUE)
@@ -209,29 +285,70 @@ model_bootstrap <- function (
   ale_xs <- NULL
   ale_ns <- NULL
 
+  # Enable parallel processing and set appropriate map function.
+  # Because furrr::future_map2 has an important .options argument absent from
+  # purrr::map2, map2_loop() is created to unify these two functions.
+  if (parallel > 0) {
+    future::plan(future::multisession, workers = parallel)
+    map2_loop <- furrr::future_map2
+  } else {
+    # If no parallel processing, do not set future::plan(future::sequential):
+    # this might interfere with other parallel processing in a larger workflow.
+    # Just do nothing parallel.
+    map2_loop <- function(..., .options = NULL) {
+      # Ignore the .options argument and pass on everything else
+      purrr::map2(...)
+    }
+  }
+
+  model_call_string_vars <- c(
+    'boot_data',
+    model_call_string_vars
+  )
+
+  # Create progress bar iterator
+  if (!silent) {
+    progress_iterator <- progressr::progressor(
+      # progressor will run once for the full dataset + boot_it times
+      steps = boot_it + 1,
+      message = 'Creating and analyzing models'
+    )
+  }
+
   model_and_ale <-
-    map2(
-      .progress = if (!silent) {
-        list(
-          name = 'Creating and analyzing models',
-          show_after = 5
-        )
-      } else {
-        FALSE
-      },
+    map2_loop(
+      .options = furrr::furrr_options(
+        # Enable parallel-processing random seed generation
+        seed = seed,
+        # transmit any globals and packages in model_call_string to the parallel workers
+        globals = model_call_string_vars,
+        packages = model_packages
+      ),
       .x = boot_data$it,
       .y = boot_data$row_idxs,
       .f = \(.it, .idxs) {
+        # Increment progress bar iterator
+        # Do not skip iterations (e.g., .it %% 10 == 0): inaccurate with parallelization
+        if (!silent) {
+          progress_iterator()
+        }
 
         # boot_data: this particular bootstrap sample
         boot_data <- data[.idxs, ]
 
-        boot_model <- # model generated on this particular bootstrap sample
-          model_call_string |>
-          stringr::str_sub(end = -2) |>  # remove the closing paranthesis ')'
-          paste0(', data = boot_data)') |>  # add data argument
-          parse(text = _) |>  # convert model call string to an expression
-          eval()
+        # If model_call_string was provided, prefer it to automatic detection
+        if (!is.null(model_call_string)) {
+          boot_model <-  # model generated on this particular bootstrap sample
+            model_call_string |>
+            parse(text = _) |>  # convert model call string to an expression
+            eval()
+        }
+        else {  # use the automatically detected model call
+          # Update the model to call to train on boot_data
+          model_call$data <- boot_data
+
+          boot_model <- eval(model_call)
+        }
 
         boot_glance <-
           if ('model_stats' %in% output) {
@@ -271,24 +388,34 @@ model_bootstrap <- function (
           } else {  # Valid model and ALE requested
 
             # Calculate ALE. Use do.call so that ale_options can be passed.
-            do.call(ale_core, utils::modifyList(list(
-              data = boot_data,
-              model = boot_model,
-              ixn = FALSE,
-              boot_it = 0,  # do not bootstrap at this inner level
-              output = c('data', 'stats'),  # do not generate plots
-              ale_xs = if (.it == 0) {
-                NULL
-              } else {
-                ale_xs
-              },
-              ale_ns = if (.it == 0) {
-                NULL
-              } else {
-                ale_ns
-              },
-              silent = silent
-            ), ale_options)  # pass all other desired options, e.g., specific x_col
+            do.call(
+              ale_core,
+              utils::modifyList(
+                list(
+                  data = boot_data,
+                  model = boot_model,
+                  ixn = FALSE,
+                  parallel = 0,  # do not parallelize at this inner level
+                  boot_it = 0,  # do not bootstrap at this inner level
+                  # do not generate plots or request conf_regions
+                  output = c('data', 'stats'),
+                  ale_xs = if (.it == 0) {
+                    NULL
+                  } else {
+                    ale_xs
+                  },
+                  ale_ns = if (.it == 0) {
+                    NULL
+                  } else {
+                    ale_ns
+                  },
+                  silent = TRUE  # silence inner bootstrap loop
+                ),
+                # pass all other desired options, e.g., specific x_col
+                ale_options
+              ),
+              # assure appropriate scoping with do.call()
+              envir = parent.frame(1)
             )
           }
 
@@ -324,6 +451,11 @@ model_bootstrap <- function (
     ) |>
     transpose()
 
+  # Disable parallel processing if it had been enabled
+  if (parallel > 0) {
+    future::plan(future::sequential)
+  }
+
 
   # Bind the model and ALE data to the bootstrap tbl
   boot_data <- boot_data |>
@@ -348,7 +480,7 @@ model_bootstrap <- function (
       boot_data |>
         # filter(it != 0) |>
         # only summarize rows other than the full dataset analysis (it == 0)
-        filter(it != if_else(
+        filter(.data$it != if_else(
           boot_it != 0,
           0,  # if boot_it != 0, remove it == 0
           -1  # else, remove nothing; analyze the unique row (it is never -1)
@@ -357,22 +489,22 @@ model_bootstrap <- function (
         bind_rows() |>
         select(-any_of(invalid_boot_model_stats)) |>
         tidyr::pivot_longer(everything()) |>
-        select(name, value) |>
+        select('name', 'value') |>
         summarize(
-          .by = name,
-          conf.low = quantile(value, boot_alpha / 2, na.rm = TRUE),
-          mean = mean(value, na.rm = TRUE),
-          median = median(value, na.rm = TRUE),
-          conf.high = quantile(value, 1 - (boot_alpha / 2), na.rm = TRUE),
-          sd = sd(value, na.rm = TRUE),
-          estimate = if_else(boot_centre == 'mean', mean, median)
+          .by = 'name',
+          conf.low = quantile(.data$value, boot_alpha / 2, na.rm = TRUE),
+          mean = mean(.data$value, na.rm = TRUE),
+          median = median(.data$value, na.rm = TRUE),
+          conf.high = quantile(.data$value, 1 - (boot_alpha / 2), na.rm = TRUE),
+          sd = sd(.data$value, na.rm = TRUE),
+          estimate = if_else(boot_centre == 'mean', .data$mean, .data$median)
         ) |>
-        select(name, estimate, everything())
+        select('name', 'estimate', everything())
       # # If y_vals is ever added...
       # |>
       #   bind_rows(tibble(
       #     name = c('sd', 'mad'),
-      #     conf.low = c(sd(y_values), mad(y_values)),
+      #     conf.low = c(sd(y_vals), mad(y_vals)),
       #     mean = conf.low,
       #     median = conf.low,
       #     conf.high = conf.low,
@@ -391,7 +523,7 @@ model_bootstrap <- function (
         boot_data |>
         # filter(it != 0) |>
         # only summarize rows other than the full dataset analysis (it == 0)
-        filter(it != if_else(
+        filter(.data$it != if_else(
           boot_it != 0,
           0,  # if boot_it != 0, remove it == 0
           -1  # else, remove nothing; analyze the unique row (it is never -1)
@@ -416,17 +548,17 @@ model_bootstrap <- function (
 
       # assign result for tidy_summary
       tidy_boot_data |>
-        select(term, estimate) |>
+        select('term', 'estimate') |>
         summarize(
-          .by = term,
-          conf.low = quantile(estimate, boot_alpha / 2, na.rm = TRUE),
-          mean = mean(estimate, na.rm = TRUE),
-          median = median(estimate, na.rm = TRUE),
-          conf.high = quantile(estimate, 1 - (boot_alpha / 2), na.rm = TRUE),
-          std.error = sd(estimate, na.rm = TRUE),
-          estimate = if_else(boot_centre == 'mean', mean, median)
+          .by = 'term',
+          conf.low = quantile(.data$estimate, boot_alpha / 2, na.rm = TRUE),
+          mean = mean(.data$estimate, na.rm = TRUE),
+          median = median(.data$estimate, na.rm = TRUE),
+          conf.high = quantile(.data$estimate, 1 - (boot_alpha / 2), na.rm = TRUE),
+          std.error = sd(.data$estimate, na.rm = TRUE),
+          estimate = if_else(boot_centre == 'mean', .data$mean, .data$median)
         ) |>
-        select(term, estimate, everything())
+        select('term', 'estimate', everything())
     } else {
       NULL
     }
@@ -469,19 +601,19 @@ model_bootstrap <- function (
               .x_col <- .x_col |>
                 map(\(.ale_tbl) {
                   .ale_tbl |>
-                    mutate(ale_x = ordered(ale_x, levels = ale_x_levels))
+                    mutate(ale_x = ordered(.data$ale_x, levels = ale_x_levels))
                 })
             }
 
             .x_col |>
               bind_rows() |>
-              group_by(ale_x) |>
+              group_by(.data$ale_x) |>
               summarize(
-                ale_y_lo = quantile(ale_y, probs = (boot_alpha / 2), na.rm = TRUE),
-                ale_y_mean = mean(ale_y, na.rm = TRUE),
-                ale_y_median = median(ale_y, na.rm = TRUE),
-                ale_y_hi = quantile(ale_y, probs = 1 - (boot_alpha / 2), na.rm = TRUE),
-                ale_y = if_else(boot_centre == 'mean', ale_y_mean, ale_y_median),
+                ale_y_lo = quantile(.data$ale_y, probs = (boot_alpha / 2), na.rm = TRUE),
+                ale_y_mean = mean(.data$ale_y, na.rm = TRUE),
+                ale_y_median = median(.data$ale_y, na.rm = TRUE),
+                ale_y_hi = quantile(.data$ale_y, probs = 1 - (boot_alpha / 2), na.rm = TRUE),
+                ale_y = if_else(boot_centre == 'mean', .data$ale_y_mean, .data$ale_y_median),
               ) |>
               right_join(
                 tibble(
@@ -490,7 +622,7 @@ model_bootstrap <- function (
                 ),
                 by = 'ale_x'
               ) |>
-              select(ale_x, ale_n, ale_y, everything())
+              select('ale_x', 'ale_n', 'ale_y', everything())
         })
 
       # Summarize bootstrapped ALE statistics
@@ -503,29 +635,40 @@ model_bootstrap <- function (
         ale_summary_stats$estimate |>
         bind_rows() |>
         tidyr::pivot_longer(
-          cols = aled:naler_max,
+          cols = 'aled':'naler_max',
           names_to = 'statistic',
           values_to = 'estimate'
         ) |>
         summarize(
-          .by = c(term, statistic),
-          conf.low = quantile(estimate, probs = (boot_alpha / 2), na.rm = TRUE),
-          median = median(estimate, na.rm = TRUE),
-          mean = mean(estimate, na.rm = TRUE),
-          conf.high = quantile(estimate, probs = 1 - (boot_alpha / 2), na.rm = TRUE),
-          estimate = if_else(boot_centre == 'mean', mean, median),
+          .by = c('term', 'statistic'),
+          conf.low = quantile(.data$estimate, probs = (boot_alpha / 2), na.rm = TRUE),
+          median = median(.data$estimate, na.rm = TRUE),
+          mean = mean(.data$estimate, na.rm = TRUE),
+          conf.high = quantile(.data$estimate, probs = 1 - (boot_alpha / 2), na.rm = TRUE),
+          estimate = if_else(boot_centre == 'mean', .data$mean, .data$median),
         ) |>
-        select(term, statistic, estimate, everything())
+        select('term', 'statistic', 'estimate', everything())
 
-      # if the user wants stats, assume they also want confidence regions
-      ale_conf_regions <-
-        ale_summary_data |>
-        map(\(.ale_data) {
-          summarize_conf_regions(.ale_data, y_summary)
-        }) |>
-        set_names(names(ale_summary_data))
+      # If an ALE p-values object was passed, calculate p-values
+      if (names(y_summary)[1] == 'p') {
+        ale_summary_stats <- ale_summary_stats |>
+          rowwise() |>  # required to get statistic function for each row
+          mutate(
+            p.value = ale_options$p_values$value_to_p[[.data$statistic]](.data$estimate),
+          ) |>
+          ungroup() |>  # undo rowwise()
+          select('term', 'statistic', 'estimate', 'p.value', everything())
+      }
 
-
+      ale_conf_regions <- summarize_conf_regions(
+        ale_summary_data,
+        y_summary,
+        sig_criterion = if (!is.null(ale_options$p_values)) {
+          'p_values'
+        } else {
+          'median_band_pct'
+        }
+      )
 
       detailed_ale_stats <- pivot_stats(ale_summary_stats)
 
@@ -539,25 +682,36 @@ model_bootstrap <- function (
           \(.x_col_data, .x_col_name) {
             plot_ale(
               .x_col_data, .x_col_name, y_col, y_type, y_summary,
-              data = data
+              # Temporarily buggy for binary y
+              x_y = tibble(data[[.x_col_name]], data[[y_col]]) |>
+                stats::setNames(c(.x_col_name, y_col)),
+
+              ## Later: pass ale_options() that might apply
+              compact_plots = compact_plots
+
+              # When y_vals is added
+              # x_y = tibble(data[[.x_col_name]], y_vals) |>
+              #   stats::setNames(c(.x_col_name, y_col)),
             )
           }
         )
 
         # Also produce an ALE effects plot
 
-        # Retrieve median_band if provided; otherwise use boot_alpha
-        median_band <- if (is.null(ale_options$median_band)) {
-          boot_alpha
+        # Retrieve median_band_pct if provided; otherwise use boot_alpha
+        median_band_pct <- if (is.null(ale_options$median_band_pct)) {
+          c(boot_alpha, boot_alpha)
         } else {
-          ale_options$median_band
+          ale_options$median_band_pct
         }
 
         detailed_ale_stats$effects_plot <- plot_effects(
           detailed_ale_stats$estimate,
           data[[y_col]],
           y_col,
-          median_band = median_band
+          y_summary,
+          # later pass ale_options like compact_plots
+          compact_plots = compact_plots
         )
 
       }
@@ -569,7 +723,9 @@ model_bootstrap <- function (
         plots = ale_summary_plots,
         conf_regions = ale_conf_regions
       )
-    } else {  # ALE not requested
+    }
+  # ALE not requested
+  else {
       NULL
     }
 

@@ -5,9 +5,9 @@
 #  Calculate ALE data
 #
 #  This function is not exported. It is uses tidyverse principles to rewrite
-#  `ALEPlot::ALEPlot`.
+#  [ALEPlot::ALEPlot()].
 #  This function is not usually called directly by the user. For details about
-#  arguments not documented here, see `ale`.
+#  arguments not documented here, see [ale()].
 #
 #  @references Apley, Daniel W., and Jingyu Zhu.
 #  "Visualizing the effects of predictor variables in black box supervised learning models."
@@ -20,48 +20,39 @@
 #
 #  @param X dataframe. Data for which ALE is to be calculated. The y (outcome)
 #  column is absent.
-#  @param model See documentation for `ale`
+#  @param model See documentation for [ale()]
 #  @param x_col character length 1. Name of single column in X for which ALE data is to
 #  be calculated.
-#  @param pred_fun See documentation for `ale`
-#  @param x_intervals See documentation for `ale`
-#  @param boot_it See documentation for `ale`
-#  @param seed See documentation for `ale`
-#  @param boot_alpha See documentation for `ale`
-#  @param boot_centre See documentation for `ale`
+#  @param pred_fun See documentation for [ale()]
+#  @param pred_type See documentation for [ale()]
+#  @param x_intervals See documentation for [ale()]
+#  @param boot_it See documentation for [ale()]
+#  @param seed See documentation for [ale()]
+#  @param boot_alpha See documentation for [ale()]
+#  @param boot_centre See documentation for [ale()]
 #  @param ale_x numeric or ordinal vector. Normally generated automatically (if
 #  NULL), but if provided, the provided value will be used instead.
 #  @param ale_n integer vector. See `ale_x`
 #  @param ale_y_norm_fun function. Custom function for normalizing ale_y for
 #  statistics. If provided, saves some time since it is usually the same for all
-#  all variables throughout one call to `ale`. For now, used as a flag to
+#  all variables throughout one call to [ale()]. For now, used as a flag to
 #  determine whether statistics will be calculated or not; if NULL, statistics
 #  will not be calculated.
+#  @param p_funs See documentation for `p_values` in [ale()]
 #
 #  @import dplyr
 #  @import purrr
 #
 calc_ale <- function(
     X, model, x_col,
-    pred_fun, x_intervals,
+    pred_fun, pred_type,
+    x_intervals,
     boot_it, seed, boot_alpha, boot_centre,
     ale_x = NULL,
     ale_n = NULL,
-    ale_y_norm_fun = NULL
+    ale_y_norm_fun = NULL,
+    p_funs = NULL
 ) {
-
-  # Hack to prevent devtools::check from thinking that NSE variables are global:
-  # Make them null local variables within the function with the issues. So,
-  # when NSE applies, the NSE variables will be prioritized over these null
-  # local variables.
-  `:=` <- NULL
-  ale_y <- NULL
-  Var1 <- NULL
-  Freq <- NULL
-  statistic <- NULL
-  estimate <- NULL
-
-
 
   n_row <- nrow(X)
   n_col <- ncol(X)
@@ -167,13 +158,15 @@ calc_ale <- function(
         boot_ale_x_int <- cut(X_boot[[x_col]], breaks = ale_x, include.lowest = TRUE) |>
           as.numeric()
 
-        X_lo <- X_boot |>  # X_boot with x_col set at the lower bound of the ALE interval
-          mutate(!!x_col := ale_x[boot_ale_x_int])
-        X_hi <- X_boot |>  # X_boot with x_col set at the upper bound of the ALE interval
-          mutate(!!x_col := ale_x[boot_ale_x_int + 1])
+        # X_boot with x_col set at the lower bound of the ALE interval
+        X_lo <- X_boot
+        X_lo[x_col] <- ale_x[boot_ale_x_int]
+        # X_boot with x_col set at the upper bound of the ALE interval
+        X_hi <- X_boot
+        X_hi[x_col] <- ale_x[boot_ale_x_int + 1]
 
         # Difference between low and high boundary predictions
-        delta_pred <- pred_fun(model, newdata = X_hi) - pred_fun(model, newdata = X_lo)
+        delta_pred <- pred_fun(model, X_hi, pred_type) - pred_fun(model, X_lo, pred_type)
 
         # Generate the cumulative ale_y predictions
         cum_pred <-
@@ -269,8 +262,6 @@ calc_ale <- function(
       }
       else if (x_type == 'multinomial') {
 
-        # browser()
-
         # calculate the indexes of the original levels after ordering them
         idx_ord_orig_level <-
           # Call function to order multinomial categories
@@ -313,9 +304,9 @@ calc_ale <- function(
         table() |>
         # Sort the table in ale_x order
         as.data.frame() |>
-        mutate(Var1 = factor(Var1, ordered = TRUE, levels = levels(ale_x))) |>
-        arrange(Var1) |>
-        pull(Freq)
+        mutate(Var1 = factor(.data$Var1, ordered = TRUE, levels = levels(ale_x))) |>
+        arrange(.data$Var1) |>
+        pull(.data$Freq)
       names(ale_n) <- levels(ale_x)
 
 
@@ -412,9 +403,9 @@ calc_ale <- function(
               levels_ale_order[lo_idxs]
             }
 
-          pred_y <- pred_fun(object = model, newdata = X_boot)
-          pred_hi <- pred_fun(object = model, newdata = X_hi[row_idx_not_hi, ])
-          pred_lo <- pred_fun(object = model, newdata = X_lo[row_idx_not_lo, ])
+          pred_y  <- pred_fun(model, X_boot, pred_type)
+          pred_hi <- pred_fun(model, X_hi[row_idx_not_hi, ], pred_type)
+          pred_lo <- pred_fun(model, X_lo[row_idx_not_lo, ], pred_type)
 
           #Take the appropriate differencing and averaging for the ALE plot
 
@@ -466,10 +457,6 @@ calc_ale <- function(
 
   }
 
-  # else {
-  #   stop("class(X[[x_col]]) must be logical, factor, ordered, integer, or numeric.")
-  # }
-
   # Center all the ale_y values
   boot_ale$ale_y <-
     map(
@@ -478,12 +465,13 @@ calc_ale <- function(
     )
 
   # Create matrix of bootstrapped ale_y values
-  boot_mx <-
-    unlist(boot_ale$ale_y) |>
-    matrix(
-      nrow = length_ale_x,  # length of any ale_y vector
-      ncol = boot_it + 1  # one column for each boot_it + full dataset
-    )
+  boot_vals <- unlist(boot_ale$ale_y)
+
+  boot_mx <- matrix(
+    boot_vals,
+    nrow = length_ale_x,  # length of any ale_y vector
+    ncol = boot_it + 1  # one column for each boot_it + full dataset
+  )
 
   # When bootstrapping, remove first column: ALE on full dataset
   if (boot_it > 0) {
@@ -499,28 +487,42 @@ calc_ale <- function(
   # Create summary statistics of bootstrap results.
   # When boot_it = 0, all values are the same
 
-  boot_summary <- tibble(
-    ale_x = ale_x,
-    ale_n = ale_n,
-    ale_y_lo = apply(
-      boot_mx, 1, stats::quantile, probs = boot_alpha / 2, na.rm = TRUE
-    ),
-    ale_y_mean = apply(boot_mx, 1, mean, na.rm = TRUE),
-    ale_y_median = apply(boot_mx, 1, stats::median, na.rm = TRUE),
-    ale_y_hi = apply(
-      boot_mx, 1, stats::quantile, probs = 1 - boot_alpha / 2, na.rm = TRUE
-    ),
-    ale_y = case_when(
-      boot_centre == 'mean' ~ ale_y_mean,
-      boot_centre == 'median' ~ ale_y_median,
-    ),
-  ) |>
-    select(ale_x, ale_n, ale_y, everything())
+  boot_summary <- if (boot_it == 0) {
+    tibble(
+      ale_y_lo = boot_vals,
+      ale_y_mean = boot_vals,
+      ale_y_median = boot_vals,
+      ale_y_hi = boot_vals,
+    )
+  } else {
+    # aggregate bootstrap results
+    tibble(
+      ale_y_lo = apply(
+        boot_mx, 1, stats::quantile, probs = boot_alpha / 2, na.rm = TRUE
+      ),
+      ale_y_mean = apply(boot_mx, 1, mean, na.rm = TRUE),
+      ale_y_median = apply(boot_mx, 1, stats::median, na.rm = TRUE),
+      ale_y_hi = apply(
+        boot_mx, 1, stats::quantile, probs = 1 - boot_alpha / 2, na.rm = TRUE
+      ),
+    )
+  }
 
+  boot_summary <- boot_summary |>
+    mutate(
+      ale_x = ale_x,
+      ale_n = ale_n,
+      ale_y = case_when(
+        boot_centre == 'mean' ~ ale_y_mean,
+        boot_centre == 'median' ~ ale_y_median,
+      ),
+    ) |>
+    select('ale_x', 'ale_n', 'ale_y', everything())
 
   # Call ale_stats for each bootstrap iteration and summarize results
   boot_stats <- NULL
-  if (!is.null(ale_y_norm_fun)) {  # only get stats if ale_y_norm_fun is provided
+  # Only get stats if ale_y_norm_fun is provided
+  if (!is.null(ale_y_norm_fun)) {
     boot_stats <- apply(
       boot_mx, 2,
       \(.it) ale_stats(.it, ale_n, ale_y_norm_fun = ale_y_norm_fun, zeroed_ale = TRUE)
@@ -541,7 +543,21 @@ calc_ale <- function(
         boot_centre == 'median' ~ median,
       ),
     ) |>
-      select(statistic, estimate, everything())
+      select('statistic', 'estimate', everything())
+
+    # If p_funs are provided, calculate p-values
+    if (!is.null(p_funs)) {
+      boot_stats <- boot_stats |>
+        mutate(
+          p.value = map2_dbl(
+            .data$estimate, .data$statistic,
+            \(.stat, .stat_name) {
+              # Call the p-value function corresponding to the named statistic
+              p_funs$value_to_p[[.stat_name]](.stat)
+            })
+        ) |>
+        select('statistic', 'estimate', 'p.value', everything())
+    }
   }
 
 
@@ -579,7 +595,6 @@ idxs_kolmogorov_smirnov <- function(
         map(\(.group) {
 
           if (all(is.na(.group))) {
-          # if (length(.group) == 1 && is.na(.group)) {
           function(x) NA
           } else {
             stats::ecdf(.group)
@@ -629,6 +644,4 @@ idxs_kolmogorov_smirnov <- function(
     (`[[`)('ix')
 
   return(idxs)
-  # return(cdm)
-
 }

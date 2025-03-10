@@ -12,11 +12,7 @@ experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](h
 [![R-CMD-check](https://github.com/tripartio/ale/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/tripartio/ale/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
-Accumulated Local Effects (ALE) were initially developed as a
-[model-agnostic approach for global explanations of the results of
-black-box machine learning
-algorithms](https://www.doi.org/10.1111/rssb.12377 "Apley, Daniel W., and Jingyu Zhu. 'Visualizing the effects of predictor variables in black box supervised learning models.' Journal of the Royal Statistical Society Series B: Statistical Methodology 82.4 (2020): 1059-1086").
-ALE has two primary advantages over other approaches like partial
+Accumulated Local Effects (ALE) were initially developed as a model-agnostic approach for global explanations of the results of black-box machine learning algorithms (Apley, Daniel W., and Jingyu Zhu. 'Visualizing the effects of predictor variables in black box supervised learning models.' Journal of the Royal Statistical Society Series B: Statistical Methodology 82.4 (2020): 1059-1086 <doi:10.1111/rssb.12377>). ALE has two primary advantages over other approaches like partial
 dependency plots (PDP) and SHapley Additive exPlanations (SHAP): its
 values are not affected by the presence of interactions among variables
 in a model and its computation is relatively rapid. This package
@@ -202,7 +198,7 @@ If you find a bug, please report it on
 [GitHub](https://github.com/tripartio/ale/issues). If you have a
 question about how to use the package, you can post it on [Stack
 Overflow with the “ale”
-tag](https://stackoverflow.com/questions/tagged/ale). I will follow that
+tag](https://stackoverflow.com). I will follow that
 tag, so I will try my best to respond quickly. However, be sure to
 always include a minimal reproducible example for your usage requests.
 If you cannot include your own dataset in the question, then use one of

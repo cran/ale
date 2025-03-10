@@ -4,7 +4,7 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 
-## ----load libraries-----------------------------------------------------------
+## ----load libraries----------------------------------------------------------- 
 library(ale)
 library(dplyr)
 

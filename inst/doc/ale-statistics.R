@@ -3,7 +3,7 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
-
+ 
 ## ----load libraries-----------------------------------------------------------
 library(mgcv)   # for datasets and the gam function
 library(dplyr)  # for data manipulation

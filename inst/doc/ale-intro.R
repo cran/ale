@@ -3,7 +3,7 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
-
+ 
 
 ## ----load libraries-----------------------------------------------------------
 library(ale)

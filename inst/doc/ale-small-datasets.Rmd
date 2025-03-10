@@ -7,7 +7,7 @@ vignette: >
   %\VignetteIndexEntry{Analyzing small datasets (fewer than 2000 rows) with ALE}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
----
+--- 
 
 ```{r knitr, include = FALSE}
 knitr::opts_chunk$set(

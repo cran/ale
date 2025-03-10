@@ -1,3 +1,7 @@
+# ale 0.3.1
+
+-   Update minimum required R version to 4.2.0 because the package uses the R pipe and placeholders.
+
 # ale 0.3.0
 
 The most significant updates are the addition of p-values for the ALE statistics, the launching of a pkgdown website which will henceforth host the development version of the package, and parallelization of core functions with a resulting performance boost.

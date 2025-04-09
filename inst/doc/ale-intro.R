@@ -3,7 +3,7 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
- 
+
 
 ## ----load libraries-----------------------------------------------------------
 library(ale)
@@ -25,6 +25,10 @@ diamonds <- ggplot2::diamonds |>
     depth_pct = depth
   )
 
+# Optional: sample 1000 rows so that the code executes faster.
+set.seed(0)
+diamonds_sample <- ggplot2::diamonds[sample(nrow(ggplot2::diamonds), 1000), ]
+
 summary(diamonds)
 
 ## ----diamonds_str-------------------------------------------------------------
@@ -35,7 +39,6 @@ summary(diamonds$price)
 
 ## ----train_gam----------------------------------------------------------------
 # Create a GAM model with flexible curves to predict diamond prices.
-# (In testing, mgcv::gam actually performed better than nnet.)
 # Smooth all numeric variables and include all other variables.
 gam_diamonds <- mgcv::gam(
   price ~ s(carat) + s(depth_pct) + s(table) + s(x_length) + s(y_width) + s(z_depth) +
@@ -44,25 +47,21 @@ gam_diamonds <- mgcv::gam(
   )
 summary(gam_diamonds)
 
-## ----enable progressr, eval = FALSE-------------------------------------------
-#  # Run this in an R console; it will not work directly within an R Markdown or Quarto block
-#  progressr::handlers(global = TRUE)
-#  progressr::handlers('cli')
-
 ## ----ale_simple---------------------------------------------------------------
 # Simple ALE without bootstrapping
-ale_gam_diamonds <- ale(
-  diamonds, gam_diamonds,
-  parallel = 2  # CRAN limit (delete this line on your own computer)
-)
+ale_gam_diamonds <- ALE(gam_diamonds)
+
+## ----create-plots-------------------------------------------------------------
+# Print a plot by entering its reference
+diamonds_plots <- plot(ale_gam_diamonds)
 
 ## ----print-carat, fig.width=3.5, fig.width=4----------------------------------
 # Print a plot by entering its reference
-ale_gam_diamonds$plots$carat
+get(diamonds_plots, 'carat')
 
 ## ----print-ale_simple, fig.width=7, fig.height=11-----------------------------
 # Print all plots
-patchwork::wrap_plots(ale_gam_diamonds$plots, ncol = 2)
+plot(diamonds_plots, ncol = 2)
 
 ## ----diamonds_new-------------------------------------------------------------
 # Bootstraping is rather slow, so create a smaller subset of new data for demonstration
@@ -72,35 +71,32 @@ diamonds_small_test <- diamonds[new_rows, ]
 
 ## ----ale_boot, fig.width=7, fig.height=11-------------------------------------
 
-ale_gam_diamonds_boot <- ale(
-  diamonds_small_test, gam_diamonds, 
-  # Normally boot_it should be set to 100, but just 10 here for a faster demonstration
-  boot_it = 10,
-  parallel = 2  # CRAN limit (delete this line on your own computer)
+ale_gam_diamonds_boot <- ALE(
+  model = gam_diamonds, 
+  data = diamonds_small_test, 
+  # Normally boot_it should be set to at least 100, but just 10 here for a faster demonstration
+  boot_it = 10
 )
 
 # Bootstrapping produces confidence intervals
-patchwork::wrap_plots(ale_gam_diamonds_boot$plots, ncol = 2)
+plot(ale_gam_diamonds_boot) |> 
+  print(ncol = 2)
 
-## ----ale_ixn------------------------------------------------------------------
+## ----ale_2D-------------------------------------------------------------------
 # ALE two-way interactions
-ale_ixn_gam_diamonds <- ale_ixn(
-  diamonds, gam_diamonds,
-  parallel = 2  # CRAN limit (delete this line on your own computer)
+ale_2D_gam_diamonds <- ALE(
+  gam_diamonds,
+  x_cols = list(d2 = TRUE)
 )
 
+## ----print-all-2D, fig.width=7, fig.height=7----------------------------------
+diamonds_2D_plots <- plot(ale_2D_gam_diamonds)
 
-## ----print-all-ale_ixn, fig.width=7, fig.height=7-----------------------------
-# Print all interaction plots
-ale_ixn_gam_diamonds$plots |>
-  # extract list of x1 ALE outputs
-  purrr::walk(\(.x1) {
-    # plot all x2 plots in each .x1 element
-    patchwork::wrap_plots(.x1, ncol = 2) |>
-      print()
-  })
-
+diamonds_2D_plots |>
+  # Select all 2D interactions that involve 'carat'
+  subset(list(d2_all = 'carat')) |> 
+  print(ncol = 2)
 
 ## ----print-specific-ixn, fig.width=5, fig.height=3----------------------------
-ale_ixn_gam_diamonds$plots$carat$depth
+get(diamonds_2D_plots, ~ carat:clarity)
 

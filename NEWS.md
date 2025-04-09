@@ -1,6 +1,79 @@
-# ale 0.3.1
+# ale 0.5.0
 
--   Update minimum required R version to 4.2.0 because the package uses the R pipe and placeholders.
+We have deeply rethought the vision of this package and have completely rewritten the entire package to support existing, new, and future planned functionality. The changes are so radical that there is no continuity with the previous version 0.3.1. Thus, we've skipped a version number and now are at version 0.5.0.
+
+Honestly, we can't keep track of all the changes; experienced users are advised to rerun the vignettes to get up to speed with the new version. We apologize for the discontinuity but we trust that the latest version is easier to use and much more functional. What follows is a list of some of the most notable changes we've kept track of.
+
+## Breaking changes
+
+* The underlying algorithm for calculating ALE has been completely rewritten to be more scalable. 
+* In addition to rewriting the code under the hood, the structure of all `ale` package objects has been completely rewritten. The latest objects are not compatible with earlier versions. However, the new structure supports the roadmap of future functionality, so we hope that there will be minimal changes in the future that interrupt backward compatibility.
+* We have created four new `{S7}` classes to represent different kinds of `ale` package objects:
+    * `ALE`: the core `ale` package object that holds ALE data for a model (replaces the former `ale()` and `ale_ixn()` functions).
+    * `ModelBoot`: results of full-model bootstrapping (replaces the former `model_bootstrap()` function).
+    * `ALEPlots`: store ALE plots generated from either `ALE` or `ModelBoot` with convenient `print()` and `plot()` methods.
+    * `ALEpDist`: p-value distribution information (replaces the former `create_p_dist()` function).
+* With the extensive rewrite, we no longer depend on `{ALEPlot}` package code and so now claim full authorship of the code. One of the most significant implications of this is that we have decided to change the package license from the GPL 2 to MIT, which permits maximum dissemination of our algorithms.
+* `ale_ixn()` has been eliminated and now both 1D and 2D ALE are calculated with the `ALE()` constructor for .
+* The `ALE` object constructor no longer produces plots directly. ALE plots are now created as `ale_plot` objects using the newly added `plot()` methods that create all possible plots from the ALE data from `ALE` or `ale_boot` objects. Thus, serializing `ALE` objects now avoids the previous problems of environment bloat of the included `ggplot` objects.
+* Renamed the `rug_sample_size` argument of the `ALE` constructor to `sample_size`. Now it reflects the size of `data` that should be sampled in the `ale` object, which can be used not only for rug plots but for other purposes.
+
+
+## Bug fixes
+
+We have dealt with innumerable bugs during our development journey but, fortunately, very few publicly signalled bugs. Only fixes for publicly reported bugs are indicated here.
+
+* Gracefully fails instead of crashing when the input data has missing values.
+
+## Other user-visible changes
+
+* The `x_cols` argument in `ALE()` now supports a complex syntax for specifying which specific columns for 1D ALE or pairs of columns for 2D interactions are desired. It also supports specification using standard R formula syntax.
+* New `get()` methods now provide convenient access to `ALE`, `ModelBoot`, and `ALEPlots` objects.
+* Confidence regions for 1D ALE are now reported more compactly.
+* With the creation of `plot()` methods, eliminated the `compact_plots` to `ale()`. 
+* `print()` and `plot()` methods have been added to the `ale_plots` object.
+* A `print()` method has been added to the `ALE` object.
+* Interactions are now supported between pairs of categorical variables. (Before, only numerical pairs or pairs with one numerical and one categorical were supported.)
+* Bootstrapping is now supported for ALE interactions.
+* 2D ALE plots have been completely rewritten. They are still implemented as tiled heatmaps but now are faceted by bootstrap quantile when ALE is bootstrapped. 
+* ALE statistics are now supported for interactions, including confidence regions.
+* Categorical y outcomes are now supported. 
+* For categorical y outcomes, plots are created for one category at a time and also for all categories combined. For 1D ALE, separate plots are available for categories overlaid on one plot and for categories faceted. For 2D ALE, plots faceted by category are available.
+* 'boot_data' is now an output option from ale(). It outputs the ALE values from each bootstrap iteration.
+* `model_bootstrap()` has added various model performance measures that are validated using bootstrap validation with the .632 correction.
+* The structure of `p_funs` has been completely changed; it has now been converted to an object named `ale_p` and the functions are separated from the object as internal functions. The function `create_p_funs()` has been renamed `create_p_dist()`.
+* `ALEpDist()` now produces three types of p-values: "exact" (very slow) with at least 1000 random iterations on the original model; "approx" for 100 to 999 iterations on the original model; and "surrogate" for much faster but less reliable p-values based on a surrogate linear model. See `ALEpDist()` for details.
+* Character input data is now accepted as a categorical datatype. It is handled the same as unordered factors.
+* Plots that display categorical outcomes all on one plot are yet to be implemented. For now, each class or category must be plotted at a time.
+* Although the standard {ALE} class supports 2D ALE interactions with ALE bootstrapping, {ModelBoot} does not yet support full-model bootstrapping for 2D ALE interactions.
+
+## Under the hood
+
+One of the most fundamental changes is not directly visible but affects how some ALE values are calculated. In certain very specific cases, the ALE values are now slightly different from those of the reference `{ALEPlot}` package. These are only for non-numerical variables for some prediction types other than predictions scaled on the response variable. (E.g., a binary or categorical variable for a logarithmic prediction not scaled to the same scale as the response variable.) We made this change for two reasons:
+
+* We can understand our implementation and its interpretation for these edge cases much better than that of the reference `{ALEPlot}` implementation. These cases are not covered at all in the base ALE scientific article and they are  poorly documented in the `{ALEPlot}` code. We cannot help users to interpret results that we do not understand ourselves.
+* Our implementation lets us write code that scales smoothly for interactions of arbitrary depth. In contrast, the `{ALEPlot}` reference implementation is not scalable: custom code must be written for each type and each degree of interaction.
+
+Other than for these edge cases, our implementation continues to give identical results to the reference `{ALEPlot}` package.
+
+Other notable changes that might not be readily visible to users:
+
+* Update required R version to >= 4.2.0 because it uses the |> pipe with placeholder.
+* Move all performance metrics to a new dedicated package, `{staccuracy}`.
+* Reduce dependencies by doing more with the `{rlang}` and `{cli}` packages. Reduced the imported functions to a minimum.
+* Package messages, warnings, and errors now use `{cli}`.
+* Replace `{assertthat}` with custom validation functions that adapt some `{assertthat}` code. 
+* Use `helper.R` test files so that some testing objects are available to the loaded package.
+* Configure `{future}` parallelization code to restore original values on exit.
+* Configure code that uses a random seed to restore the original system seed on exit.
+* Improve memory efficiency of `ale_p` objects.
+* Update plotting code for compatibility with `{ggplot2}` 3.5.
+* Add testing code coverage with `{covr}`.
+
+## Known issues to be addressed in a future version
+
+* Effects plots for interactions have not yet been implemented.
+
 
 # ale 0.3.0
 
@@ -8,7 +81,7 @@ The most significant updates are the addition of p-values for the ALE statistics
 
 ## Breaking changes
 
--   One of the key goals for the `{ale}` package is that it would be truly model-agnostic: it should support any R object that can be considered a model, where a model is defined as an object that makes a prediction for each input row of data that it is provided. Towards this goal, we had to adjust the custom predict function to make it more flexible for various kinds of model objects. We are happy that our changes now enable support for `tidymodels` objects and various survival models (but for now, only those that return single-vector predictions). So, **in addition to taking required `object` and `newdata` arguments, the custom predict function `pred_fun` in the `ale()` function now also requires an argument for `type` to specify the prediction type**, whether it is used or not. This change breaks previous code that used custom predict functions, but it allows `ale` to analyze many new model types than before. Code that did not require custom predict functions should not be affected by this change. See the updated documentation of the `ale()` function for details.
+-   One of the key goals for the `ale` package is that it would be truly model-agnostic: it should support any R object that can be considered a model, where a model is defined as an object that makes a prediction for each input row of data that it is provided. Towards this goal, we had to adjust the custom predict function to make it more flexible for various kinds of model objects. We are happy that our changes now enable support for `tidymodels` objects and various survival models (but for now, only those that return single-vector predictions). So, **in addition to taking required `object` and `newdata` arguments, the custom predict function `pred_fun` in the `ale()` function now also requires an argument for `type` to specify the prediction type**, whether it is used or not. This change breaks previous code that used custom predict functions, but it allows `ale` to analyze many new model types than before. Code that did not require custom predict functions should not be affected by this change. See the updated documentation of the `ale()` function for details.
 
 -   Another change that breaks former code is that the arguments for `model_bootstrap()` have been modified. Instead of a cumbersome `model_call_string`, **`model_bootstrap()` now uses the `{insight}` package to automatically detect many R models and directly manipulate the model object as needed**. So, the second argument is now the `model` object. However, for non-standard models that `{insight}` cannot automatically parse, a modified `model_call_string` is still available to assure model-agnostic functionality. Although this change breaks former code that ran `model_bootstrap()`, we believe that the new function interface is much more user-friendly.
 
@@ -20,7 +93,7 @@ The most significant updates are the addition of p-values for the ALE statistics
 -   **P-values are now provided for all ALE statistics.** However, their calculation is very slow, so they are disabled by default; they must be explicitly requested. When requested, they will be automatically calculated when possible (for standard R model types); if not, some additional steps must be taken for their calculation. See the new `create_p_funs()` function for details and an example.
 -   The **normalization formula for ALE statistics** was changed such that very minor differences from the median are normalized as zero. Before this adjustment, the former normalization formula could give some tiny differences apparently large normalized effects. See the updated documentation in `vignette('ale-statistics')` for details. The vignette has been expanded with more details on how to properly interpret normalized ALE statistics.
 -   **Normalized ALE range (NALER) is now expressed as percentile points relative to the median** (ranging from -50% to +50%) rather than its original formulation as absolute percentiles (ranging from 0 to 100%). See the updated documentation in `vignette('ale-statistics')` for details.
--   Performance has been dramatically improved by the addition of **parallelization** by default. We use the `{furrr}` library. In our tests, practically, we typically found speed-ups of `n – 2` where `n` is the number of physical cores (machine learning is generally unable to use logical cores). For example, a computer with 4 physical cores should see at least ×2 speed-up and a computer with 6 physical cores should see at least ×4 speed-up. However, parallelization is tricky with our model-agnostic design. When users work with models that follow standard R conventions, the `{ale}` package should be able to automatically configure the system for parallelization. But for some non-standard models users may have to explicitly list the model's packages in the new `model_packages` argument so that each parallel thread can find all necessary functions. This is only a concern if you get weird errors. See `help(ale)` for details.
+-   Performance has been dramatically improved by the addition of **parallelization** by default. We use the `{furrr}` library. In our tests, practically, we typically found speed-ups of `n – 2` where `n` is the number of physical cores (machine learning is generally unable to use logical cores). For example, a computer with 4 physical cores should see at least ×2 speed-up and a computer with 6 physical cores should see at least ×4 speed-up. However, parallelization is tricky with our model-agnostic design. When users work with models that follow standard R conventions, the `ale` package should be able to automatically configure the system for parallelization. But for some non-standard models users may have to explicitly list the model's packages in the new `model_packages` argument so that each parallel thread can find all necessary functions. This is only a concern if you get weird errors. See `help(ale)` for details.
 -   Fully documented the output of the `ale()` function. See `help(ale)` for details.
 -   The `median_band_pct` argument to `ale()` now takes a vector of two numbers, one for the inner band and one for the outer.
 -   Switched recommendation of calculating ALE data on test data to instead calculate it on the full dataset with the final deployment model.
@@ -63,7 +136,7 @@ This version introduces various ALE-based statistics that let ALE be used for st
 -   We added new **ALE-based statistics: ALED and ALER** with their normalized versions **NALED and NALER**. `ale()` and `model_bootstrap()` now output these statistics. (`ale_ixn()` will come later.)
 -   We added **rug plots** to numeric values and **percentage frequencies** to the plots of categories. These indicators give a quick visual indication of the distribution of plotted data.
 -   We added a vignette that introduces **ALE-based statistics**, especially effect size measures, and demonstrates how to use them for statistical inference: "ALE-based statistics for statistical inference and effect sizes" (available from the vignettes link on the main CRAN page at <https://CRAN.R-project.org/package=ale>).
--   We added a vignette that compares the `ale` package with the reference **{ALEPlot} package**: "Comparison between `{ALEPlot}` and `{ale}` packages" (available from the vignettes link on the main CRAN page at <https://CRAN.R-project.org/package=ale>).
+-   We added a vignette that compares the `ale` package with the reference **`{ALEPlot}` package**: "Comparison between `{ALEPlot}` and `ale` packages" (available from the vignettes link on the main CRAN page at <https://CRAN.R-project.org/package=ale>).
 -   We added two **datasets**:
     -   `var_cars` is a modified version of mtcars that features many different types of variables.
     -   `census` is a polished version of the adult income dataset used for a vignette in the `{ALEPlot}` package.
